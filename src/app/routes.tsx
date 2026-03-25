@@ -3,6 +3,7 @@ import { MapScreen } from './components/MapScreen';
 import { LocationMemoryScreen } from './components/LocationMemoryScreen';
 import { MemoryDetailScreen } from './components/MemoryDetailScreen';
 import { AddMemoryScreen } from './components/AddMemoryScreen';
+import { TimelineScreen } from './components/TimelineScreen';
 
 const Root = () => {
   return <MapScreen />;
@@ -20,10 +21,18 @@ const AddRoot = () => {
   return <AddMemoryScreen />;
 };
 
+const TimelineRoot = () => {
+  return <TimelineScreen />;
+};
+
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: Root,
+  },
+  {
+    path: '/timeline',
+    Component: TimelineRoot,
   },
   {
     path: '/location/:id',
