@@ -145,6 +145,33 @@ export function MemoryDetailScreen() {
               </p>
             </div>
           )}
+
+          {/* Book */}
+          {memory.type === 'book' && memory.book && (
+            <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start' }}>
+              {memory.book.cover_url && (
+                <img src={memory.book.cover_url} alt="" style={{ width: '120px', flexShrink: 0, boxShadow: '0 4px 16px var(--paper-shadow)', display: 'block' }} />
+              )}
+              <div style={{ flex: 1 }}>
+                <h3 style={{ color: 'var(--ink-text)', fontSize: '1.2rem', fontWeight: 400, margin: '0 0 6px', lineHeight: 1.4 }}>{memory.book.title}</h3>
+                {memory.book.author && (
+                  <p style={{ color: 'var(--ink-light)', fontSize: '0.875rem', margin: '0 0 20px' }}>{memory.book.author}</p>
+                )}
+                {memory.book.reading_notes && (
+                  <p style={{ color: 'var(--ink-text)', fontSize: '0.9rem', lineHeight: '1.9', margin: '0 0 20px', whiteSpace: 'pre-wrap' }}>{memory.book.reading_notes}</p>
+                )}
+                {memory.book.quotes && memory.book.quotes.length > 0 && (
+                  <div style={{ borderLeft: '2px solid var(--ink-faint)', paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {memory.book.quotes.map((q) => (
+                      <p key={q.id || q.order} style={{ color: 'var(--ink-light)', fontSize: '0.875rem', lineHeight: '1.8', margin: 0, fontStyle: 'italic' }}>
+                        {q.content}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </motion.div>
       </div>
 

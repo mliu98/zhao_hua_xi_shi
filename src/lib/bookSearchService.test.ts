@@ -4,96 +4,69 @@ import { searchBooks } from './bookSearchService'
 describe('searchBooks', () => {
   it('returns mapped results for a normal response', async () => {
     const mockResponse = {
-      docs: [
+      items: [
         {
-          title: 'The Great Gatsby',
-          author_name: ['F. Scott Fitzgerald'],
-          cover_i: 12345,
-          key: '/works/OL45804W',
+          id: 'abc123',
+          volumeInfo: {
+            title: 'The Great Gatsby',
+            authors: ['F. Scott Fitzgerald'],
+            imageLinks: { thumbnail: 'http://books.google.com/thumbnail/abc123' },
+          },
         },
         {
-          title: 'To Kill a Mockingbird',
-          author_name: ['Harper Lee'],
-          cover_i: undefined,
-          key: '/works/OL2798819W',
+          id: 'def456',
+          volumeInfo: {
+            title: '挪威的森林',
+            authors: ['村上春树'],
+            imageLinks: undefined,
+          },
         },
       ],
     }
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        json: () => Promise.resolve(mockResponse),
-      })
-    )
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve(mockResponse) }))
 
     const results = await searchBooks('gatsby')
 
     expect(results).toHaveLength(2)
-
     expect(results[0]).toEqual({
       title: 'The Great Gatsby',
       author: 'F. Scott Fitzgerald',
-      coverUrl: 'https://covers.openlibrary.org/b/id/12345-M.jpg',
-      olid: 'OL45804W',
+      coverUrl: 'https://books.google.com/thumbnail/abc123', // http → https
+      id: 'abc123',
     })
-
     expect(results[1]).toEqual({
-      title: 'To Kill a Mockingbird',
-      author: 'Harper Lee',
+      title: '挪威的森林',
+      author: '村上春树',
       coverUrl: null,
-      olid: 'OL2798819W',
+      id: 'def456',
     })
 
     vi.unstubAllGlobals()
   })
 
-  it('returns empty array when docs is empty', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        json: () => Promise.resolve({ docs: [] }),
-      })
-    )
+  it('returns empty array when items is empty', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve({ items: [] }) }))
 
     const results = await searchBooks('xyznonexistent')
-
     expect(results).toEqual([])
 
     vi.unstubAllGlobals()
   })
 
-  it('returns empty array for a nonexistent query without throwing', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        json: () => Promise.resolve({ docs: [] }),
-      })
-    )
+  it('returns empty array when items is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve({}) }))
 
-    let results: Awaited<ReturnType<typeof searchBooks>> | undefined
-    let error: unknown
-
-    try {
-      results = await searchBooks('zzzzzzzzzzzzzzzzzzzzzzz')
-    } catch (e) {
-      error = e
-    }
-
-    expect(error).toBeUndefined()
+    const results = await searchBooks('zzzzzzzzzzzzz')
     expect(results).toEqual([])
 
     vi.unstubAllGlobals()
   })
 
   it('returns empty array when fetch throws', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new Error('Network error'))
-    )
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')))
 
     const results = await searchBooks('anything')
-
     expect(results).toEqual([])
 
     vi.unstubAllGlobals()
