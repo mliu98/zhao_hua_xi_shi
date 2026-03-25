@@ -1,49 +1,30 @@
 import { createBrowserRouter } from 'react-router';
+import { AppLayout } from './components/AppLayout';
 import { MapScreen } from './components/MapScreen';
 import { LocationMemoryScreen } from './components/LocationMemoryScreen';
 import { MemoryDetailScreen } from './components/MemoryDetailScreen';
 import { AddMemoryScreen } from './components/AddMemoryScreen';
 import { TimelineScreen } from './components/TimelineScreen';
 
-const Root = () => {
-  return <MapScreen />;
-};
-
-const LocationRoot = () => {
-  return <LocationMemoryScreen />;
-};
-
-const MemoryRoot = () => {
-  return <MemoryDetailScreen />;
-};
-
-const AddRoot = () => {
-  return <AddMemoryScreen />;
-};
-
-const TimelineRoot = () => {
-  return <TimelineScreen />;
-};
-
 export const router = createBrowserRouter([
   {
     path: '/',
-    Component: Root,
-  },
-  {
-    path: '/timeline',
-    Component: TimelineRoot,
+    Component: AppLayout,
+    children: [
+      { index: true, Component: MapScreen },
+      { path: 'timeline', Component: TimelineScreen },
+    ],
   },
   {
     path: '/location/:id',
-    Component: LocationRoot,
+    Component: LocationMemoryScreen,
   },
   {
     path: '/memory/:id',
-    Component: MemoryRoot,
+    Component: MemoryDetailScreen,
   },
   {
     path: '/add',
-    Component: AddRoot,
+    Component: AddMemoryScreen,
   },
 ]);
