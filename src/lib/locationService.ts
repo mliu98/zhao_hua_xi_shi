@@ -22,6 +22,17 @@ export async function createLocation(name: string, lat: number, lng: number): Pr
   return data
 }
 
+export async function getLocationById(id: string): Promise<Location | null> {
+  const { data, error } = await supabase
+    .from('locations')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) return null
+  return data
+}
+
 export async function searchByName(query: string): Promise<NominatimResult[]> {
   if (!query.trim()) return []
 
