@@ -181,3 +181,97 @@ export async function createBookMemory(
     book: { memory_id: memory.id, title: book.title, author: book.author, cover_url: coverUrl, reading_notes: book.readingNotes || null, quotes: quotes.map((content, i) => ({ id: '', memory_id: memory.id, content, order: i })) }
   } as Memory
 }
+
+export async function updatePhotoMemory(
+  memoryId: string,
+  date: string,
+  caption: string | undefined,
+  newImageFiles: File[],
+  removeImageIds: string[]
+): Promise<void> {
+  const { error: memError } = await supabase.from('memories').update({ date }).eq('id', memoryId)
+  if (memError) throw memError
+
+  const { error: photoError } = await supabase.from('memory_photos').update({ caption: caption || null }).eq('memory_id', memoryId)
+  if (photoError) throw photoError
+
+  if (removeImageIds.length > 0) {
+    const { error } = await supabase.from('photo_images').delete().in('id', removeImageIds)
+    if (error) throw error
+  }
+
+  if (newImageFiles.length > 0) {
+    const { data: existing } = await supabase.from('photo_images').select('order').eq('memory_id', memoryId).order('order', { ascending: false }).limit(1)
+    const nextOrder = existing?.[0] ? (existing[0] as any).order + 1 : 0
+    const uploaded = await Promise.all(
+      newImageFiles.map(async (file, i) => {
+        const path = `photos/${memoryId}-${Date.now()}-${i}-${file.name.replace(/\s+/g, '_')}`
+        const imageUrl = await uploadImage(file, path)
+        return { memory_id: memoryId, image_url: imageUrl, order: nextOrder + i }
+      })
+    )
+    const { error } = await supabase.from('photo_images').insert(uploaded)
+    if (error) throw error
+  }
+}
+
+export async function updateNoteMemory(
+  memoryId: string,
+  date: string,
+  content: string | undefined,
+  newImageFiles: File[],
+  removeImageIds: string[]
+): Promise<void> {
+  const { error: memError } = await supabase.from('memories').update({ date }).eq('id', memoryId)
+  if (memError) throw memError
+
+  const { error: noteError } = await supabase.from('memory_notes').update({ content: content || null }).eq('memory_id', memoryId)
+  if (noteError) throw noteError
+
+  if (removeImageIds.length > 0) {
+    const { error } = await supabase.from('note_images').delete().in('id', removeImageIds)
+    if (error) throw error
+  }
+
+  if (newImageFiles.length > 0) {
+    const { data: existing } = await supabase.from('note_images').select('order').eq('memory_id', memoryId).order('order', { ascending: false }).limit(1)
+    const nextOrder = existing?.[0] ? (existing[0] as any).order + 1 : 0
+    const uploaded = await Promise.all(
+      newImageFiles.map(async (file, i) => {
+        const path = `notes/${memoryId}-${Date.now()}-${i}-${file.name.replace(/\s+/g, '_')}`
+        const imageUrl = await uploadImage(file, path)
+        return { memory_id: memoryId, image_url: imageUrl, order: nextOrder + i }
+      })
+    )
+    const { error } = await supabase.from('note_images').insert(uploaded)
+    if (error) throw error
+  }
+}
+
+export async function updateBookMemory(
+  memoryId: string,
+  date: string,
+  book: BookData,
+  quotes: string[]
+): Promise<void> {
+  const { error: memError } = await supabase.from('memories').update({ date }).eq('id', memoryId)
+  if (memError) throw memError
+
+  let coverUrl = book.coverUrl ?? null
+  if (book.coverFile) {
+    const path = `books/${memoryId}-cover-${Date.now()}-${book.coverFile.name.replace(/\s+/g, '_')}`
+    coverUrl = await uploadImage(book.coverFile, path)
+  }
+
+  const { error: bookError } = await supabase.from('memory_books').update({
+    title: book.title, author: book.author, cover_url: coverUrl, reading_notes: book.readingNotes || null
+  }).eq('memory_id', memoryId)
+  if (bookError) throw bookError
+
+  // Replace all quotes
+  await supabase.from('book_quotes').delete().eq('memory_id', memoryId)
+  if (quotes.length > 0) {
+    const { error } = await supabase.from('book_quotes').insert(quotes.map((content, i) => ({ memory_id: memoryId, content, order: i })))
+    if (error) throw error
+  }
+}
