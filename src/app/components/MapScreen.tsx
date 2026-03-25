@@ -110,6 +110,46 @@ export function MapScreen() {
         </p>
       </motion.div>
 
+      {/* Nav tabs */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.35, duration: 0.6 }}
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '32px',
+          paddingBottom: '16px',
+          borderBottom: '1px solid var(--ink-faint)',
+          marginBottom: '8px',
+        }}
+      >
+        <span
+          style={{
+            color: 'var(--ink-text)',
+            fontSize: '0.875rem',
+            paddingBottom: '4px',
+            borderBottom: '1px solid var(--ink-text)',
+            fontFamily: 'var(--font-serif)',
+          }}
+        >
+          地图
+        </span>
+        <Link
+          to="/timeline"
+          style={{
+            color: 'var(--ink-faint)',
+            fontSize: '0.875rem',
+            textDecoration: 'none',
+            paddingBottom: '4px',
+            fontFamily: 'var(--font-serif)',
+          }}
+          className="hover:opacity-70 transition-opacity"
+        >
+          时间线
+        </Link>
+      </motion.div>
+
       {/* Search */}
       <motion.div
         initial={{ opacity: 0 }}
