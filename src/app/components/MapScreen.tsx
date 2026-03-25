@@ -88,68 +88,7 @@ export function MapScreen() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8 }}
-      className="min-h-screen flex flex-col"
-      style={{ fontFamily: 'var(--font-serif)' }}
-    >
-      {/* Title */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.8 }}
-        className="text-center py-8 px-6"
-      >
-        <h1 className="mb-2" style={{ color: 'var(--ink-text)', fontSize: '1.75rem', fontWeight: 400, letterSpacing: '0.02em' }}>
-          朝花夕拾
-        </h1>
-        <p style={{ color: 'var(--ink-light)', fontSize: '0.875rem', fontWeight: 400 }}>
-          Dawn Blossoms Plucked at Dusk
-        </p>
-      </motion.div>
-
-      {/* Nav tabs */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.35, duration: 0.6 }}
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '32px',
-          paddingBottom: '16px',
-          borderBottom: '1px solid var(--ink-faint)',
-          marginBottom: '8px',
-        }}
-      >
-        <span
-          style={{
-            color: 'var(--ink-text)',
-            fontSize: '0.875rem',
-            paddingBottom: '4px',
-            borderBottom: '1px solid var(--ink-text)',
-            fontFamily: 'var(--font-serif)',
-          }}
-        >
-          地图
-        </span>
-        <Link
-          to="/timeline"
-          style={{
-            color: 'var(--ink-faint)',
-            fontSize: '0.875rem',
-            textDecoration: 'none',
-            paddingBottom: '4px',
-            fontFamily: 'var(--font-serif)',
-          }}
-          className="hover:opacity-70 transition-opacity"
-        >
-          时间线
-        </Link>
-      </motion.div>
-
+    <div className="flex flex-col flex-1" style={{ fontFamily: 'var(--font-serif)' }}>
       {/* Search */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -329,6 +268,6 @@ export function MapScreen() {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
