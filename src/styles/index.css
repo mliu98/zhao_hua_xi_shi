@@ -19,4 +19,6 @@ body::before {
 
 body {
   font-family: var(--font-serif);
+  line-height: 1.85;
+  -webkit-font-smoothing: antialiased;
 }
