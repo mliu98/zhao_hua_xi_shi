@@ -18,17 +18,31 @@ export interface Memory {
   book?: MemoryBook & { quotes: BookQuote[] }
 }
 
-export interface MemoryPhoto {
+export interface PhotoImage {
+  id: string
   memory_id: string
   image_url: string
+  order: number
+}
+
+export interface NoteImage {
+  id: string
+  memory_id: string
+  image_url: string
+  order: number
+}
+
+export interface MemoryPhoto {
+  memory_id: string
   caption: string | null
+  images: PhotoImage[]
 }
 
 export interface MemoryNote {
   memory_id: string
   note_type: 'handwritten' | 'text'
-  image_url: string | null
   content: string | null
+  images: NoteImage[]
 }
 
 export interface MemoryBook {
