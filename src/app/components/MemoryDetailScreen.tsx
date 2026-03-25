@@ -1,18 +1,37 @@
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { motion } from 'motion/react';
-import { memories, locations } from '../data/memories';
 import { ArrowLeft } from 'lucide-react';
-import { useState } from 'react';
+import { getMemoryById } from '../../lib/memoryService';
+import type { Memory } from '../../lib/types';
 
 export function MemoryDetailScreen() {
   const { id } = useParams();
-  const memory = memories.find((m) => m.id === id);
-  const location = memory ? locations.find((l) => l.id === memory.locationId) : null;
-  const [imageScale, setImageScale] = useState(1);
+  const [memory, setMemory] = useState<Memory | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [zoomed, setZoomed] = useState(false);
 
-  if (!memory || !location) {
-    return <div>Memory not found</div>;
+  useEffect(() => {
+    getMemoryById(id!).then(setMemory).catch(console.error).finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ fontFamily: 'var(--font-serif)', color: 'var(--ink-faint)', fontSize: '0.875rem' }}>
+        …
+      </div>
+    );
   }
+
+  if (!memory) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ fontFamily: 'var(--font-serif)', color: 'var(--ink-faint)', fontSize: '0.875rem' }}>
+        找不到这条记忆
+      </div>
+    );
+  }
+
+  const locationName = (memory as any).location?.name ?? '';
 
   return (
     <motion.div
@@ -25,16 +44,16 @@ export function MemoryDetailScreen() {
       {/* Header */}
       <div className="max-w-3xl mx-auto w-full mb-8">
         <Link
-          to={`/location/${location.id}`}
+          to={`/location/${memory.location_id}`}
           style={{ color: 'var(--ink-light)', fontSize: '0.875rem' }}
           className="inline-flex items-center gap-2 hover:opacity-70 transition-opacity"
         >
           <ArrowLeft size={16} />
-          {location.name}
+          {locationName}
         </Link>
       </div>
 
-      {/* Memory Display */}
+      {/* Content */}
       <div className="flex-1 flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -42,51 +61,22 @@ export function MemoryDetailScreen() {
           transition={{ delay: 0.3, duration: 0.8 }}
           className="max-w-xl w-full"
         >
-          {memory.type === 'note' || memory.type === 'photo' ? (
+          {memory.type === 'photo' && memory.photo && (
             <div
               className="overflow-hidden cursor-zoom-in transition-transform"
               style={{
                 boxShadow: '0 4px 16px var(--paper-shadow)',
-                transform: `scale(${imageScale})`,
+                transform: zoomed ? 'scale(1.5)' : 'scale(1)',
+                transition: 'transform 0.4s ease',
               }}
-              onClick={() => setImageScale(imageScale === 1 ? 1.5 : 1)}
+              onClick={() => setZoomed(!zoomed)}
             >
               <img
-                src={memory.imageUrl}
-                alt=""
+                src={memory.photo.image_url}
+                alt={memory.photo.caption ?? ''}
                 className="w-full"
-                style={{ filter: 'contrast(0.92) saturate(0.85)' }}
+                style={{ display: 'block', filter: 'contrast(0.92) saturate(0.85)' }}
               />
-            </div>
-          ) : (
-            <div
-              className="p-12 text-center"
-              style={{
-                background: 'var(--paper-warm)',
-                boxShadow: '0 2px 8px var(--paper-shadow)',
-                border: '1px solid rgba(58, 54, 50, 0.08)',
-              }}
-            >
-              <div
-                style={{
-                  color: 'var(--ink-text)',
-                  fontSize: '1.5rem',
-                  marginBottom: '12px',
-                  fontWeight: 400,
-                  letterSpacing: '0.02em',
-                }}
-              >
-                {memory.bookTitle}
-              </div>
-              <div
-                style={{
-                  color: 'var(--ink-light)',
-                  fontSize: '1rem',
-                  fontStyle: 'italic',
-                }}
-              >
-                {memory.bookAuthor}
-              </div>
             </div>
           )}
         </motion.div>
@@ -99,29 +89,14 @@ export function MemoryDetailScreen() {
         transition={{ delay: 0.6, duration: 0.8 }}
         className="max-w-3xl mx-auto w-full mt-8 text-center"
       >
-        <div style={{ color: 'var(--ink-faint)', fontSize: '0.875rem' }}>
-          {memory.date}
-        </div>
-        <div
-          style={{
-            color: 'var(--ink-light)',
-            fontSize: '0.875rem',
-            marginTop: '4px',
-          }}
-        >
-          {location.name}
-        </div>
-        {memory.type !== 'book' && memory.bookTitle && (
-          <div
-            style={{
-              color: 'var(--ink-light)',
-              fontSize: '0.8125rem',
-              marginTop: '8px',
-              fontStyle: 'italic',
-            }}
-          >
-            {memory.bookTitle} · {memory.bookAuthor}
-          </div>
+        {memory.type === 'photo' && memory.photo?.caption && (
+          <p style={{ color: 'var(--ink-text)', fontSize: '0.9rem', marginBottom: '8px' }}>
+            {memory.photo.caption}
+          </p>
+        )}
+        <div style={{ color: 'var(--ink-faint)', fontSize: '0.8rem' }}>{memory.date}</div>
+        {locationName && (
+          <div style={{ color: 'var(--ink-light)', fontSize: '0.8rem', marginTop: '4px' }}>{locationName}</div>
         )}
       </motion.div>
     </motion.div>
