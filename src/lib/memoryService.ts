@@ -2,15 +2,21 @@ import { supabase } from './supabaseClient'
 import { uploadImage } from './storageService'
 import type { Memory } from './types'
 
-// Supabase returns one-to-one relations as arrays; unwrap them
 function normalizeMemory(raw: any) {
+  const photo = Array.isArray(raw.photo) ? raw.photo[0] ?? null : raw.photo
+  const note = Array.isArray(raw.note) ? raw.note[0] ?? null : raw.note
   const book = Array.isArray(raw.book) ? raw.book[0] ?? null : raw.book
   const quotes = Array.isArray(raw.quotes) ? raw.quotes : []
+  const photoImages = Array.isArray(raw.photo_images) ? raw.photo_images : []
+  const noteImages = Array.isArray(raw.note_images) ? raw.note_images : []
+
   return {
     ...raw,
-    photo: Array.isArray(raw.photo) ? raw.photo[0] ?? null : raw.photo,
-    note: Array.isArray(raw.note) ? raw.note[0] ?? null : raw.note,
+    photo: photo ? { ...photo, images: photoImages } : null,
+    note: note ? { ...note, images: noteImages } : null,
     book: book ? { ...book, quotes } : null,
+    photo_images: undefined,
+    note_images: undefined,
     quotes: undefined,
   }
 }
@@ -18,7 +24,9 @@ function normalizeMemory(raw: any) {
 const MEMORY_SELECT = `
   *,
   photo:memory_photos(*),
+  photo_images(order, image_url, id),
   note:memory_notes(*),
+  note_images(order, image_url, id),
   book:memory_books(*),
   quotes:book_quotes(*)
 `
@@ -58,12 +66,9 @@ export async function getMemoryById(id: string): Promise<Memory | null> {
 export async function createPhotoMemory(
   locationId: string,
   date: string,
-  imageFile: File,
+  imageFiles: File[],
   caption?: string
 ): Promise<Memory> {
-  const path = `photos/${Date.now()}-${imageFile.name.replace(/\s+/g, '_')}`
-  const imageUrl = await uploadImage(imageFile, path)
-
   const { data: memory, error: memError } = await supabase
     .from('memories')
     .insert({ location_id: locationId, type: 'photo', date })
@@ -74,12 +79,57 @@ export async function createPhotoMemory(
 
   const { error: photoError } = await supabase
     .from('memory_photos')
-    .insert({ memory_id: memory.id, image_url: imageUrl, caption: caption || null })
+    .insert({ memory_id: memory.id, caption: caption || null })
 
   if (photoError) throw photoError
 
-  return {
-    ...memory,
-    photo: { memory_id: memory.id, image_url: imageUrl, caption: caption || null },
-  } as Memory
+  const uploadedImages = await Promise.all(
+    imageFiles.map(async (file, i) => {
+      const path = `photos/${memory.id}-${i}-${file.name.replace(/\s+/g, '_')}`
+      const imageUrl = await uploadImage(file, path)
+      return { memory_id: memory.id, image_url: imageUrl, order: i }
+    })
+  )
+
+  const { error: imgError } = await supabase.from('photo_images').insert(uploadedImages)
+  if (imgError) throw imgError
+
+  return { ...memory, photo: { memory_id: memory.id, caption: caption || null, images: uploadedImages as any } } as Memory
+}
+
+export async function createNoteMemory(
+  locationId: string,
+  date: string,
+  noteType: 'text' | 'handwritten',
+  content?: string,
+  imageFiles?: File[]
+): Promise<Memory> {
+  const { data: memory, error: memError } = await supabase
+    .from('memories')
+    .insert({ location_id: locationId, type: 'note', date })
+    .select()
+    .single()
+
+  if (memError) throw memError
+
+  const { error: noteError } = await supabase
+    .from('memory_notes')
+    .insert({ memory_id: memory.id, note_type: noteType, content: content || null })
+
+  if (noteError) throw noteError
+
+  let uploadedImages: any[] = []
+  if (noteType === 'handwritten' && imageFiles && imageFiles.length > 0) {
+    uploadedImages = await Promise.all(
+      imageFiles.map(async (file, i) => {
+        const path = `notes/${memory.id}-${i}-${file.name.replace(/\s+/g, '_')}`
+        const imageUrl = await uploadImage(file, path)
+        return { memory_id: memory.id, image_url: imageUrl, order: i }
+      })
+    )
+    const { error: imgError } = await supabase.from('note_images').insert(uploadedImages)
+    if (imgError) throw imgError
+  }
+
+  return { ...memory, note: { memory_id: memory.id, note_type: noteType, content: content || null, images: uploadedImages } } as Memory
 }

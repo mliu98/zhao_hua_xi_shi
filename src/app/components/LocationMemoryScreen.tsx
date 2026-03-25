@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { getLocationById } from '../../lib/locationService';
 import { getMemoriesByLocation } from '../../lib/memoryService';
 import { getMemoryLayout } from '../../lib/pseudoRandom';
+import { StackedImages } from './StackedImages';
 import type { Location, Memory } from '../../lib/types';
 
 export function LocationMemoryScreen() {
@@ -26,53 +27,28 @@ export function LocationMemoryScreen() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ fontFamily: 'var(--font-serif)', color: 'var(--ink-faint)', fontSize: '0.875rem' }}>
-        …
-      </div>
+      <div className="min-h-screen flex items-center justify-center" style={{ fontFamily: 'var(--font-serif)', color: 'var(--ink-faint)', fontSize: '0.875rem' }}>…</div>
     );
   }
 
   if (!location) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ fontFamily: 'var(--font-serif)', color: 'var(--ink-faint)', fontSize: '0.875rem' }}>
-        找不到这个地点
-      </div>
+      <div className="min-h-screen flex items-center justify-center" style={{ fontFamily: 'var(--font-serif)', color: 'var(--ink-faint)', fontSize: '0.875rem' }}>找不到这个地点</div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8 }}
-      className="min-h-screen p-6"
-      style={{ fontFamily: 'var(--font-serif)' }}
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }} className="min-h-screen p-6" style={{ fontFamily: 'var(--font-serif)' }}>
       {/* Header */}
       <div className="max-w-4xl mx-auto mb-12">
-        <Link
-          to="/"
-          style={{ color: 'var(--ink-light)', fontSize: '0.875rem' }}
-          className="inline-flex items-center gap-2 mb-6 hover:opacity-70 transition-opacity"
-        >
-          <ArrowLeft size={16} />
-          返回
+        <Link to="/" style={{ color: 'var(--ink-light)', fontSize: '0.875rem' }} className="inline-flex items-center gap-2 mb-6 hover:opacity-70 transition-opacity">
+          <ArrowLeft size={16} /> 返回
         </Link>
-
         <div className="flex items-baseline justify-between">
-          <motion.h2
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.8 }}
-            style={{ color: 'var(--ink-text)', fontSize: '1.5rem', fontWeight: 400, letterSpacing: '0.02em' }}
-          >
+          <motion.h2 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.8 }} style={{ color: 'var(--ink-text)', fontSize: '1.5rem', fontWeight: 400, letterSpacing: '0.02em' }}>
             {location.name}
           </motion.h2>
-          <Link
-            to={`/add?locationId=${id}`}
-            style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textDecoration: 'none' }}
-            className="hover:opacity-70 transition-opacity"
-          >
+          <Link to={`/add?locationId=${id}`} style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textDecoration: 'none' }} className="hover:opacity-70 transition-opacity">
             + 添加
           </Link>
         </div>
@@ -81,12 +57,7 @@ export function LocationMemoryScreen() {
       {/* Memory space */}
       <div className="max-w-4xl mx-auto relative" style={{ minHeight: '500px' }}>
         {memories.length === 0 ? (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.8 }}
-            style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textAlign: 'center', marginTop: '80px' }}
-          >
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4, duration: 0.8 }} style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textAlign: 'center', marginTop: '80px' }}>
             还没有记忆
           </motion.p>
         ) : (
@@ -101,15 +72,33 @@ export function LocationMemoryScreen() {
                 style={{ position: 'absolute', left: `${x}%`, top: `${y}%`, transform: `rotate(${rotation}deg)` }}
               >
                 <Link to={`/memory/${memory.id}`} className="block hover:scale-105 transition-transform">
+                  {/* Photo */}
                   {memory.type === 'photo' && memory.photo && (
-                    <div style={{ width: '160px', boxShadow: '0 2px 8px var(--paper-shadow)', overflow: 'hidden' }}>
-                      <img
-                        src={memory.photo.image_url}
-                        alt={memory.photo.caption ?? ''}
-                        style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block', filter: 'contrast(0.92) saturate(0.85)' }}
-                      />
+                    memory.photo.images.length > 1
+                      ? <StackedImages urls={memory.photo.images.map(i => i.image_url)} />
+                      : <div style={{ width: '160px', overflow: 'hidden', boxShadow: '0 2px 8px var(--paper-shadow)' }}>
+                          <img src={memory.photo.images[0]?.image_url} alt="" style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block', filter: 'contrast(0.92) saturate(0.85)' }} />
+                        </div>
+                  )}
+
+                  {/* Note: handwritten */}
+                  {memory.type === 'note' && memory.note?.note_type === 'handwritten' && memory.note.images.length > 0 && (
+                    memory.note.images.length > 1
+                      ? <StackedImages urls={memory.note.images.map(i => i.image_url)} />
+                      : <div style={{ width: '160px', overflow: 'hidden', boxShadow: '0 2px 8px var(--paper-shadow)', border: '3px solid var(--paper-warm)' }}>
+                          <img src={memory.note.images[0].image_url} alt="" style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block', filter: 'contrast(0.92) saturate(0.85)' }} />
+                        </div>
+                  )}
+
+                  {/* Note: text */}
+                  {memory.type === 'note' && memory.note?.note_type === 'text' && (
+                    <div style={{ width: '160px', minHeight: '120px', padding: '14px', background: 'var(--paper-warm)', boxShadow: '0 2px 8px var(--paper-shadow)', border: '1px solid rgba(58,54,50,0.08)' }}>
+                      <p style={{ color: 'var(--ink-text)', fontSize: '0.78rem', lineHeight: '1.7', margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical' }}>
+                        {memory.note.content}
+                      </p>
                     </div>
                   )}
+
                   <div style={{ color: 'var(--ink-faint)', fontSize: '0.7rem', marginTop: '6px', transform: `rotate(-${rotation}deg)` }}>
                     {memory.date}
                   </div>
