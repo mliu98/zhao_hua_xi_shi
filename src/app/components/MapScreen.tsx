@@ -36,7 +36,11 @@ function getTextSnippet(memories: Memory[]): string | null {
     if (m.type === 'book' && m.book?.quotes) m.book.quotes.forEach((q) => snippets.push(q.content));
   }
   const pick = pickRandom(snippets);
-  return pick ? pick.slice(0, 80) : null;
+  if (!pick) return null
+  // Take up to first 2 sentences, max 50 chars
+  const sentences = pick.match(/[^。！？.!?]+[。！？.!?]*/g) ?? [pick]
+  const short = sentences.slice(0, 2).join('').trim()
+  return short.length > 50 ? short.slice(0, 50) + '…' : short;
 }
 
 function getRandomPhoto(memories: Memory[]): string | null {
