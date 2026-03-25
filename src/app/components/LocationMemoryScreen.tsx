@@ -99,6 +99,18 @@ export function LocationMemoryScreen() {
                     </div>
                   )}
 
+                  {/* Book */}
+                  {memory.type === 'book' && memory.book && (
+                    memory.book.cover_url
+                      ? <div style={{ width: '110px', overflow: 'hidden', boxShadow: '0 2px 8px var(--paper-shadow)' }}>
+                          <img src={memory.book.cover_url} alt="" style={{ width: '100%', height: '150px', objectFit: 'cover', display: 'block', filter: 'contrast(0.92) saturate(0.85)' }} />
+                        </div>
+                      : <div style={{ width: '110px', height: '150px', padding: '12px', background: 'var(--paper-warm)', boxShadow: '0 2px 8px var(--paper-shadow)', border: '1px solid rgba(58,54,50,0.08)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <p style={{ color: 'var(--ink-text)', fontSize: '0.78rem', lineHeight: '1.5', margin: 0 }}>{memory.book.title}</p>
+                          {memory.book.author && <p style={{ color: 'var(--ink-light)', fontSize: '0.7rem', marginTop: '6px', margin: '6px 0 0' }}>{memory.book.author}</p>}
+                        </div>
+                  )}
+
                   <div style={{ color: 'var(--ink-faint)', fontSize: '0.7rem', marginTop: '6px', transform: `rotate(-${rotation}deg)` }}>
                     {memory.date}
                   </div>
