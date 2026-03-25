@@ -101,7 +101,7 @@ export function MemoryDetailScreen() {
       style={{ fontFamily: 'var(--font-serif)' }}
     >
       {/* Header */}
-      <div className="max-w-3xl mx-auto w-full mb-8">
+      <div className="max-w-3xl mx-auto w-full mb-8 flex items-center justify-between">
         <Link
           to={`/location/${memory.location_id}`}
           style={{ color: 'var(--ink-light)', fontSize: '0.875rem' }}
@@ -109,6 +109,13 @@ export function MemoryDetailScreen() {
         >
           <ArrowLeft size={16} />
           {locationName}
+        </Link>
+        <Link
+          to={`/memory/${memory.id}/edit`}
+          style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textDecoration: 'none' }}
+          className="hover:opacity-70 transition-opacity"
+        >
+          编辑
         </Link>
       </div>
 
