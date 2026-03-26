@@ -52,6 +52,7 @@ export function AddMemoryScreen() {
   const [bookCoverFile, setBookCoverFile] = useState<File | null>(null);
   const [bookCoverPreview, setBookCoverPreview] = useState<string | null>(null);
   const [readingNotes, setReadingNotes] = useState('');
+  const [bookReadDate, setBookReadDate] = useState(new Date().toISOString().slice(0, 10));
   const [quotes, setQuotes] = useState<string[]>(['']);
   const bookDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +77,7 @@ export function AddMemoryScreen() {
     setBookCoverFile(null);
     setBookCoverPreview(null);
     setReadingNotes('');
+    setBookReadDate(new Date().toISOString().slice(0, 10));
     setQuotes(['']);
     setError('');
   }, [type, noteSubtype]);
@@ -167,7 +169,7 @@ export function AddMemoryScreen() {
           await createBookMemory(locationId, date, bookData, filledQuotes);
           navigate(`/location/${locationId}`);
         } else {
-          const book = await createBook(bookData, filledQuotes);
+          const book = await createBook({ ...bookData, readDate: bookReadDate }, filledQuotes);
           navigate(`/book/${book.id}`);
         }
       }
@@ -336,6 +338,14 @@ export function AddMemoryScreen() {
                   </div>
                 )}
               </div>
+
+              {/* Read date — only for standalone books (no location) */}
+              {!locationId && (
+                <div>
+                  <label style={labelStyle}>读完于</label>
+                  <input type="date" value={bookReadDate} onChange={(e) => setBookReadDate(e.target.value)} style={inputStyle} />
+                </div>
+              )}
 
               {/* Reading notes */}
               <div>

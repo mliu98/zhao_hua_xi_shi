@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, Minus, Plus, X } from 'lucide-react';
-import { getBookById, updateBook, getLinkedMemories } from '../../lib/bookService';
+import { getBookById, updateBook, deleteBook, getLinkedMemories } from '../../lib/bookService';
 import { searchBooks } from '../../lib/bookSearchService';
 import type { BookSearchResult } from '../../lib/bookSearchService';
 import { AnimatePresence } from 'motion/react';
@@ -30,6 +30,8 @@ export function BookDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
   // Edit state
@@ -41,6 +43,7 @@ export function BookDetailScreen() {
   const [readingNotes, setReadingNotes] = useState('');
   const [quotes, setQuotes] = useState<string[]>(['']);
   const [bookQuery, setBookQuery] = useState('');
+  const [bookReadDate, setBookReadDate] = useState('');
   const [bookResults, setBookResults] = useState<BookSearchResult[]>([]);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const bookDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,18 +56,21 @@ export function BookDetailScreen() {
       if (b) {
         setBook(b);
         setLinkedMemories(mems);
-        resetEditState(b);
+        resetEditState(b, mems);
       }
     }).catch(console.error).finally(() => setLoading(false));
   }, [id]);
 
-  function resetEditState(b: Book) {
+  function resetEditState(b: Book, mems?: LinkedMemory[]) {
     setBookTitle(b.title);
     setBookAuthor(b.author);
     setBookCoverUrl(b.cover_url);
     setBookCoverPreview(b.cover_url);
     setBookCoverFile(null);
     setReadingNotes(b.reading_notes ?? '');
+    // Pre-fill read_date: use explicit value if set, else earliest linked memory date
+    const fallback = (mems ?? linkedMemories)[0]?.memory?.date ?? '';
+    setBookReadDate(b.read_date ?? fallback);
     setQuotes(b.quotes.length > 0 ? b.quotes.map((q) => q.content) : ['']);
     setBookQuery('');
     setBookResults([]);
@@ -111,6 +117,7 @@ export function BookDetailScreen() {
         coverUrl: bookCoverUrl,
         coverFile: bookCoverFile ?? undefined,
         readingNotes: readingNotes.trim() || undefined,
+        readDate: bookReadDate || null,
       }, filledQuotes);
       const updated = await getBookById(book.id);
       if (updated) setBook(updated);
@@ -119,6 +126,20 @@ export function BookDetailScreen() {
       setError(`保存失败：${err?.message || JSON.stringify(err)}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!book) return;
+    setDeleting(true);
+    try {
+      await deleteBook(book.id);
+      navigate('/bookshelf');
+    } catch (err: any) {
+      setError(`删除失败：${err?.message || JSON.stringify(err)}`);
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -156,13 +177,43 @@ export function BookDetailScreen() {
           >
             <ArrowLeft size={16} /> 书架
           </Link>
-          <button
-            onClick={() => editing ? (resetEditState(book), setEditing(false)) : setEditing(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)' }}
-            className="hover:opacity-70 transition-opacity"
-          >
-            {editing ? '取消' : '编辑'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {!editing && (
+              confirmDelete ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ color: 'var(--ink-faint)', fontSize: '0.75rem', fontFamily: 'var(--font-serif)' }}>确认删除？</span>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-light)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)', opacity: deleting ? 0.5 : 1 }}
+                  >
+                    {deleting ? '删除中…' : '确认'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)' }}
+                  >
+                    取消
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)' }}
+                  className="hover:opacity-70 transition-opacity"
+                >
+                  删除
+                </button>
+              )
+            )}
+            <button
+              onClick={() => { editing ? (resetEditState(book), setEditing(false)) : setEditing(true); setConfirmDelete(false); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)' }}
+              className="hover:opacity-70 transition-opacity"
+            >
+              {editing ? '取消' : '编辑'}
+            </button>
+          </div>
         </div>
 
         {editing ? (
@@ -230,6 +281,10 @@ export function BookDetailScreen() {
                   <span style={{ color: 'var(--ink-faint)', fontSize: '0.7rem', textAlign: 'center', padding: '4px' }}>上传封面</span>
                 </div>
               )}
+            </div>
+            <div>
+              <label style={labelStyle}>读完于</label>
+              <input type="date" value={bookReadDate} onChange={(e) => setBookReadDate(e.target.value)} style={inputStyle} />
             </div>
             <div>
               <label style={labelStyle}>读书笔记（可选）</label>

@@ -51,8 +51,10 @@ export interface Book {
   author: string
   cover_url: string | null
   reading_notes: string | null
+  read_date: string | null
   created_at: string
   quotes: BookQuote[]
+  memoryDates?: string[] // linked memory dates, used for year filtering
 }
 
 export interface BookQuote {
