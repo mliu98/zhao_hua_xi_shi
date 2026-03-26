@@ -6,6 +6,8 @@ import { MemoryDetailScreen } from './components/MemoryDetailScreen';
 import { EditMemoryScreen } from './components/EditMemoryScreen';
 import { AddMemoryScreen } from './components/AddMemoryScreen';
 import { TimelineScreen } from './components/TimelineScreen';
+import { BookshelfScreen } from './components/BookshelfScreen';
+import { BookDetailScreen } from './components/BookDetailScreen';
 
 export const router = createBrowserRouter([
   {
@@ -14,6 +16,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: MapScreen },
       { path: 'timeline', Component: TimelineScreen },
+      { path: 'bookshelf', Component: BookshelfScreen },
     ],
   },
   {
@@ -27,6 +30,10 @@ export const router = createBrowserRouter([
   {
     path: '/memory/:id/edit',
     Component: EditMemoryScreen,
+  },
+  {
+    path: '/book/:id',
+    Component: BookDetailScreen,
   },
   {
     path: '/add',

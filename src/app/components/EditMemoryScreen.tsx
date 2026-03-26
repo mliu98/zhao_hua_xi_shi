@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, X, Plus, Minus } from 'lucide-react';
 import { getMemoryById, updatePhotoMemory, updateNoteMemory, updateBookMemory } from '../../lib/memoryService';
+// BookData re-exported from memoryService for backwards compat
 import type { Memory, PhotoImage, NoteImage } from '../../lib/types';
 
 const inputStyle: React.CSSProperties = {

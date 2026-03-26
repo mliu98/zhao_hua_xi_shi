@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, X, Plus, Minus } from 'lucide-react';
 import { getLocations } from '../../lib/locationService';
 import { createPhotoMemory, createNoteMemory, createBookMemory } from '../../lib/memoryService';
+import { createBook } from '../../lib/bookService';
 import { searchBooks } from '../../lib/bookSearchService';
 import type { BookSearchResult } from '../../lib/bookSearchService';
 import type { Location } from '../../lib/types';
@@ -27,7 +28,8 @@ export function AddMemoryScreen() {
   const [searchParams] = useSearchParams();
   const preselectedLocationId = searchParams.get('locationId') ?? '';
 
-  const [type, setType] = useState<MemoryType>('photo');
+  const preselectedType = (searchParams.get('type') as MemoryType | null) ?? 'photo';
+  const [type, setType] = useState<MemoryType>(preselectedType);
   const [noteSubtype, setNoteSubtype] = useState<NoteSubtype>('text');
   const [locations, setLocations] = useState<Location[]>([]);
   const [locationId, setLocationId] = useState(preselectedLocationId);
@@ -136,7 +138,7 @@ export function AddMemoryScreen() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!locationId) { setError('请选择地点'); return; }
+    if (type !== 'book' && !locationId) { setError('请选择地点'); return; }
     if (!date) { setError('请选择日期'); return; }
     if (type === 'photo' && imageFiles.length === 0) { setError('请至少上传一张照片'); return; }
     if (type === 'note' && noteSubtype === 'handwritten' && imageFiles.length === 0) { setError('请至少上传一张手写笔记图片'); return; }
@@ -148,19 +150,27 @@ export function AddMemoryScreen() {
     try {
       if (type === 'photo') {
         await createPhotoMemory(locationId, date, imageFiles, caption || undefined);
+        navigate(`/location/${locationId}`);
       } else if (type === 'note') {
         await createNoteMemory(locationId, date, noteSubtype, noteContent || undefined, imageFiles.length > 0 ? imageFiles : undefined);
+        navigate(`/location/${locationId}`);
       } else if (type === 'book') {
         const filledQuotes = quotes.map((q) => q.trim()).filter(Boolean);
-        await createBookMemory(locationId, date, {
+        const bookData = {
           title: bookTitle.trim(),
           author: bookAuthor.trim(),
           coverUrl: bookCoverUrl,
           coverFile: bookCoverFile ?? undefined,
           readingNotes: readingNotes.trim() || undefined,
-        }, filledQuotes);
+        };
+        if (locationId) {
+          await createBookMemory(locationId, date, bookData, filledQuotes);
+          navigate(`/location/${locationId}`);
+        } else {
+          const book = await createBook(bookData, filledQuotes);
+          navigate(`/book/${book.id}`);
+        }
       }
-      navigate(`/location/${locationId}`);
     } catch (err: any) {
       setError(`保存失败：${err?.message || JSON.stringify(err)}`);
       console.error(err);
@@ -363,7 +373,7 @@ export function AddMemoryScreen() {
 
           {/* Location */}
           <div>
-            <label style={labelStyle}>地点</label>
+            <label style={labelStyle}>{type === 'book' ? '地点（可选）' : '地点'}</label>
             <select value={locationId} onChange={(e) => setLocationId(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
               <option value="">选择地点</option>
               {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
