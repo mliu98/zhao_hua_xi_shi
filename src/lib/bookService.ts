@@ -81,6 +81,23 @@ export async function createBook(bookData: BookData, quotes: string[]): Promise<
   } as Book
 }
 
+export async function deleteBook(id: string): Promise<void> {
+  // Delete linked memories first (memory_books cascade-deletes when memory is deleted)
+  const { data: links } = await supabase
+    .from('memory_books')
+    .select('memory_id')
+    .eq('book_id', id)
+
+  if (links && links.length > 0) {
+    const memoryIds = links.map((l: any) => l.memory_id)
+    await supabase.from('memories').delete().in('id', memoryIds)
+  }
+
+  // Delete the book (cascades to book_quotes and any remaining memory_books)
+  const { error } = await supabase.from('books').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function updateBook(id: string, bookData: BookData, quotes: string[]): Promise<void> {
   let coverUrl = bookData.coverUrl ?? null
   if (bookData.coverFile) {

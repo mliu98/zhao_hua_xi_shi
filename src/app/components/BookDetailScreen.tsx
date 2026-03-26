@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, Minus, Plus, X } from 'lucide-react';
-import { getBookById, updateBook, getLinkedMemories } from '../../lib/bookService';
+import { getBookById, updateBook, deleteBook, getLinkedMemories } from '../../lib/bookService';
 import { searchBooks } from '../../lib/bookSearchService';
 import type { BookSearchResult } from '../../lib/bookSearchService';
 import { AnimatePresence } from 'motion/react';
@@ -30,6 +30,8 @@ export function BookDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
   // Edit state
@@ -127,6 +129,20 @@ export function BookDetailScreen() {
     }
   }
 
+  async function handleDelete() {
+    if (!book) return;
+    setDeleting(true);
+    try {
+      await deleteBook(book.id);
+      navigate('/bookshelf');
+    } catch (err: any) {
+      setError(`删除失败：${err?.message || JSON.stringify(err)}`);
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ fontFamily: 'var(--font-serif)', color: 'var(--ink-faint)', fontSize: '0.875rem' }}>
@@ -161,13 +177,43 @@ export function BookDetailScreen() {
           >
             <ArrowLeft size={16} /> 书架
           </Link>
-          <button
-            onClick={() => editing ? (resetEditState(book), setEditing(false)) : setEditing(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)' }}
-            className="hover:opacity-70 transition-opacity"
-          >
-            {editing ? '取消' : '编辑'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {!editing && (
+              confirmDelete ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ color: 'var(--ink-faint)', fontSize: '0.75rem', fontFamily: 'var(--font-serif)' }}>确认删除？</span>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-light)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)', opacity: deleting ? 0.5 : 1 }}
+                  >
+                    {deleting ? '删除中…' : '确认'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)' }}
+                  >
+                    取消
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)' }}
+                  className="hover:opacity-70 transition-opacity"
+                >
+                  删除
+                </button>
+              )
+            )}
+            <button
+              onClick={() => { editing ? (resetEditState(book), setEditing(false)) : setEditing(true); setConfirmDelete(false); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)' }}
+              className="hover:opacity-70 transition-opacity"
+            >
+              {editing ? '取消' : '编辑'}
+            </button>
+          </div>
         </div>
 
         {editing ? (
