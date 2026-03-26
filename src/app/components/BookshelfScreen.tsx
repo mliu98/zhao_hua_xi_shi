@@ -18,8 +18,14 @@ function spineColor(id: string): string {
   return SPINE_COLORS[Math.abs(hash) % SPINE_COLORS.length];
 }
 
+function spineHeight(title: string): number {
+  // Subtle variation: 185–235px based on title length
+  return Math.min(235, Math.max(185, 165 + title.length * 3));
+}
+
 function BookSpine({ book, index }: { book: Book; index: number }) {
   const color = spineColor(book.id);
+  const height = spineHeight(book.title);
 
   return (
     <motion.div
@@ -27,13 +33,13 @@ function BookSpine({ book, index }: { book: Book; index: number }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.05 * index, duration: 0.6 }}
       whileHover={{ y: -8, transition: { duration: 0.2 } }}
-      style={{ display: 'inline-block' }}
+      style={{ display: 'inline-block', alignSelf: 'flex-end' }}
     >
       <Link to={`/book/${book.id}`} style={{ textDecoration: 'none' }}>
         <div
           style={{
             width: '48px',
-            height: '220px',
+            height: `${height}px`,
             background: color,
             display: 'flex',
             flexDirection: 'column',
@@ -45,18 +51,18 @@ function BookSpine({ book, index }: { book: Book; index: number }) {
             boxShadow: '2px 0 6px rgba(0,0,0,0.18), inset -1px 0 0 rgba(255,255,255,0.06)',
           }}
         >
-          {/* Title */}
+          {/* Title — mixed orientation: Chinese stays upright, Latin rotates naturally */}
           <span
             style={{
               writingMode: 'vertical-rl',
-              textOrientation: 'upright',
+              textOrientation: 'mixed',
               color: 'rgba(255,255,255,0.88)',
               fontSize: '0.75rem',
-              letterSpacing: '0.04em',
+              letterSpacing: '0.02em',
               fontFamily: 'var(--font-serif)',
-              maxHeight: '150px',
+              maxHeight: `${height - 50}px`,
               overflow: 'hidden',
-              lineHeight: 1,
+              lineHeight: 1.2,
             }}
           >
             {book.title}
@@ -65,14 +71,14 @@ function BookSpine({ book, index }: { book: Book; index: number }) {
           <span
             style={{
               writingMode: 'vertical-rl',
-              textOrientation: 'upright',
+              textOrientation: 'mixed',
               color: 'rgba(255,255,255,0.45)',
               fontSize: '0.6rem',
-              letterSpacing: '0.03em',
+              letterSpacing: '0.01em',
               fontFamily: 'var(--font-serif)',
-              maxHeight: '60px',
+              maxHeight: '48px',
               overflow: 'hidden',
-              lineHeight: 1,
+              lineHeight: 1.2,
             }}
           >
             {book.author}
@@ -124,7 +130,7 @@ export function BookshelfScreen() {
                   style={{
                     display: 'flex',
                     flexWrap: 'wrap',
-                    gap: '4px',
+                    gap: '3px',
                     alignItems: 'flex-end',
                     paddingBottom: '12px',
                   }}
