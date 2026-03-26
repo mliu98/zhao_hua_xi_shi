@@ -27,7 +27,7 @@ export function AppLayout() {
         transition={{ delay: 0.45, duration: 0.8 }}
         style={{ display: 'flex', justifyContent: 'center', gap: '40px', paddingBottom: '2rem' }}
       >
-        {[{ to: '/', label: '地图', end: true }, { to: '/timeline', label: '时间线', end: false }].map(({ to, label, end }) => (
+        {[{ to: '/', label: '地图', end: true }, { to: '/timeline', label: '时间线', end: false }, { to: '/bookshelf', label: '书架', end: false }].map(({ to, label, end }) => (
           <NavLink
             key={to}
             to={to}

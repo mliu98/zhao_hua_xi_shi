@@ -15,7 +15,7 @@ export interface Memory {
   // joined from sub-tables
   photo?: MemoryPhoto
   note?: MemoryNote
-  book?: MemoryBook & { quotes: BookQuote[] }
+  book?: Book
 }
 
 export interface PhotoImage {
@@ -45,17 +45,19 @@ export interface MemoryNote {
   images: NoteImage[]
 }
 
-export interface MemoryBook {
-  memory_id: string
+export interface Book {
+  id: string
   title: string
   author: string
   cover_url: string | null
   reading_notes: string | null
+  created_at: string
+  quotes: BookQuote[]
 }
 
 export interface BookQuote {
   id: string
-  memory_id: string
+  book_id: string
   content: string
   order: number
 }

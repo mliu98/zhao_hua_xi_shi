@@ -1,31 +1,32 @@
 import { supabase } from './supabaseClient'
 import { uploadImage } from './storageService'
+import { createBook, updateBook } from './bookService'
+import type { BookData } from './bookService'
 import type { Memory } from './types'
 
-export interface BookData {
-  title: string
-  author: string
-  coverUrl?: string | null
-  coverFile?: File
-  readingNotes?: string
-}
+export type { BookData }
 
 function normalizeMemory(raw: any) {
   const photo = Array.isArray(raw.photo) ? raw.photo[0] ?? null : raw.photo
   const note = Array.isArray(raw.note) ? raw.note[0] ?? null : raw.note
-  const book = Array.isArray(raw.book) ? raw.book[0] ?? null : raw.book
-  const quotes = Array.isArray(raw.quotes) ? raw.quotes : []
   const photoImages = Array.isArray(raw.photo_images) ? raw.photo_images : []
   const noteImages = Array.isArray(raw.note_images) ? raw.note_images : []
+
+  // Navigate memory_books → books (with quotes)
+  const bookLink = Array.isArray(raw.book_link) ? raw.book_link[0] ?? null : raw.book_link
+  const bookData = bookLink?.book ?? null
+  const quotes = bookData && Array.isArray(bookData.quotes)
+    ? bookData.quotes.sort((a: any, b: any) => a.order - b.order)
+    : []
 
   return {
     ...raw,
     photo: photo ? { ...photo, images: photoImages } : null,
     note: note ? { ...note, images: noteImages } : null,
-    book: book ? { ...book, quotes } : null,
+    book: bookData ? { ...bookData, quotes } : null,
     photo_images: undefined,
     note_images: undefined,
-    quotes: undefined,
+    book_link: undefined,
   }
 }
 
@@ -35,8 +36,7 @@ const MEMORY_SELECT = `
   photo_images(order, image_url, id),
   note:memory_notes(*),
   note_images(order, image_url, id),
-  book:memory_books(*),
-  quotes:book_quotes(*)
+  book_link:memory_books(book:books(*, quotes:book_quotes(*)))
 `
 
 export async function getMemoriesByLocation(locationId: string): Promise<Memory[]> {
@@ -145,9 +145,13 @@ export async function createNoteMemory(
 export async function createBookMemory(
   locationId: string,
   date: string,
-  book: BookData,
+  bookData: BookData,
   quotes: string[]
 ): Promise<Memory> {
+  // Create the book record
+  const book = await createBook(bookData, quotes)
+
+  // Create the memory
   const { data: memory, error: memError } = await supabase
     .from('memories')
     .insert({ location_id: locationId, type: 'book', date })
@@ -156,30 +160,14 @@ export async function createBookMemory(
 
   if (memError) throw memError
 
-  let coverUrl = book.coverUrl ?? null
-  if (book.coverFile) {
-    const path = `books/${memory.id}-cover-${book.coverFile.name.replace(/\s+/g, '_')}`
-    coverUrl = await uploadImage(book.coverFile, path)
-  }
-
-  const { error: bookError } = await supabase
+  // Link memory → book
+  const { error: linkError } = await supabase
     .from('memory_books')
-    .insert({ memory_id: memory.id, title: book.title, author: book.author, cover_url: coverUrl, reading_notes: book.readingNotes || null })
+    .insert({ memory_id: memory.id, book_id: book.id })
 
-  if (bookError) throw bookError
+  if (linkError) throw linkError
 
-  if (quotes.length > 0) {
-    const { error: quotesError } = await supabase
-      .from('book_quotes')
-      .insert(quotes.map((content, i) => ({ memory_id: memory.id, content, order: i })))
-
-    if (quotesError) throw quotesError
-  }
-
-  return {
-    ...memory,
-    book: { memory_id: memory.id, title: book.title, author: book.author, cover_url: coverUrl, reading_notes: book.readingNotes || null, quotes: quotes.map((content, i) => ({ id: '', memory_id: memory.id, content, order: i })) }
-  } as Memory
+  return { ...memory, book } as Memory
 }
 
 export async function updatePhotoMemory(
@@ -251,27 +239,14 @@ export async function updateNoteMemory(
 export async function updateBookMemory(
   memoryId: string,
   date: string,
-  book: BookData,
+  bookData: BookData,
   quotes: string[]
 ): Promise<void> {
   const { error: memError } = await supabase.from('memories').update({ date }).eq('id', memoryId)
   if (memError) throw memError
 
-  let coverUrl = book.coverUrl ?? null
-  if (book.coverFile) {
-    const path = `books/${memoryId}-cover-${Date.now()}-${book.coverFile.name.replace(/\s+/g, '_')}`
-    coverUrl = await uploadImage(book.coverFile, path)
-  }
+  const { data: link } = await supabase.from('memory_books').select('book_id').eq('memory_id', memoryId).single()
+  if (!link) throw new Error('No book linked to this memory')
 
-  const { error: bookError } = await supabase.from('memory_books').update({
-    title: book.title, author: book.author, cover_url: coverUrl, reading_notes: book.readingNotes || null
-  }).eq('memory_id', memoryId)
-  if (bookError) throw bookError
-
-  // Replace all quotes
-  await supabase.from('book_quotes').delete().eq('memory_id', memoryId)
-  if (quotes.length > 0) {
-    const { error } = await supabase.from('book_quotes').insert(quotes.map((content, i) => ({ memory_id: memoryId, content, order: i })))
-    if (error) throw error
-  }
+  await updateBook(link.book_id, bookData, quotes)
 }
