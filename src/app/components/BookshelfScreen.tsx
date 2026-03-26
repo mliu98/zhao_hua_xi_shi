@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
-import { getAllBooks } from '../../lib/bookService';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getAllBooks, getAvailableYears, getBooksForYear } from '../../lib/bookService';
 import type { Book } from '../../lib/types';
 
 const SPINE_COLORS = [
@@ -19,7 +20,6 @@ function spineColor(id: string): string {
 }
 
 function spineHeight(title: string): number {
-  // Subtle variation: 185–235px based on title length
   return Math.min(235, Math.max(185, 165 + title.length * 3));
 }
 
@@ -31,7 +31,7 @@ function BookSpine({ book, index }: { book: Book; index: number }) {
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.05 * index, duration: 0.6 }}
+      transition={{ delay: 0.04 * index, duration: 0.5 }}
       whileHover={{ y: -8, transition: { duration: 0.2 } }}
       style={{ display: 'inline-block', alignSelf: 'flex-end' }}
     >
@@ -47,11 +47,9 @@ function BookSpine({ book, index }: { book: Book; index: number }) {
             justifyContent: 'space-between',
             padding: '14px 0',
             cursor: 'pointer',
-            position: 'relative',
             boxShadow: '2px 0 6px rgba(0,0,0,0.18), inset -1px 0 0 rgba(255,255,255,0.06)',
           }}
         >
-          {/* Title — mixed orientation: Chinese stays upright, Latin rotates naturally */}
           <span
             style={{
               writingMode: 'vertical-rl',
@@ -67,7 +65,6 @@ function BookSpine({ book, index }: { book: Book; index: number }) {
           >
             {book.title}
           </span>
-          {/* Author */}
           <span
             style={{
               writingMode: 'vertical-rl',
@@ -89,13 +86,61 @@ function BookSpine({ book, index }: { book: Book; index: number }) {
   );
 }
 
+function YearNavigator({
+  years,
+  selected,
+  onChange,
+}: {
+  years: number[];
+  selected: number;
+  onChange: (y: number) => void;
+}) {
+  const idx = years.indexOf(selected);
+  const canPrev = idx < years.length - 1; // years sorted descending
+  const canNext = idx > 0;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontFamily: 'var(--font-serif)' }}>
+      <button
+        onClick={() => canPrev && onChange(years[idx + 1])}
+        disabled={!canPrev}
+        style={{ background: 'none', border: 'none', cursor: canPrev ? 'pointer' : 'default', padding: '4px', color: canPrev ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: canPrev ? 1 : 0.3, display: 'flex', alignItems: 'center' }}
+      >
+        <ChevronLeft size={14} />
+      </button>
+      <span style={{ color: 'var(--ink-text)', fontSize: '0.875rem', minWidth: '36px', textAlign: 'center' }}>
+        {selected}
+      </span>
+      <button
+        onClick={() => canNext && onChange(years[idx - 1])}
+        disabled={!canNext}
+        style={{ background: 'none', border: 'none', cursor: canNext ? 'pointer' : 'default', padding: '4px', color: canNext ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: canNext ? 1 : 0.3, display: 'flex', alignItems: 'center' }}
+      >
+        <ChevronRight size={14} />
+      </button>
+    </div>
+  );
+}
+
 export function BookshelfScreen() {
-  const [books, setBooks] = useState<Book[]>([]);
+  const [allBooks, setAllBooks] = useState<Book[]>([]);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAllBooks().then(setBooks).catch(console.error).finally(() => setLoading(false));
+    getAllBooks().then((books) => {
+      setAllBooks(books);
+      const years = getAvailableYears(books);
+      setAvailableYears(years);
+      if (years.length > 0) {
+        const currentYear = new Date().getFullYear();
+        setSelectedYear(years.includes(currentYear) ? currentYear : years[0]);
+      }
+    }).catch(console.error).finally(() => setLoading(false));
   }, []);
+
+  const booksThisYear = getBooksForYear(allBooks, selectedYear);
 
   return (
     <div style={{ fontFamily: 'var(--font-serif)', minHeight: '60vh', paddingBottom: '4rem' }}>
@@ -110,7 +155,7 @@ export function BookshelfScreen() {
           transition={{ duration: 0.6 }}
           className="px-6 max-w-5xl mx-auto"
         >
-          {books.length === 0 ? (
+          {allBooks.length === 0 ? (
             <div style={{ textAlign: 'center', paddingTop: '6rem', color: 'var(--ink-faint)', fontSize: '0.875rem' }}>
               <p style={{ marginBottom: '2rem' }}>书架还空着</p>
               <Link
@@ -123,9 +168,19 @@ export function BookshelfScreen() {
             </div>
           ) : (
             <>
+              {/* Year navigator */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
+                {availableYears.length > 0 && (
+                  <YearNavigator
+                    years={availableYears}
+                    selected={selectedYear}
+                    onChange={setSelectedYear}
+                  />
+                )}
+              </div>
+
               {/* Shelf */}
               <div style={{ position: 'relative' }}>
-                {/* Books row */}
                 <div
                   style={{
                     display: 'flex',
@@ -133,9 +188,10 @@ export function BookshelfScreen() {
                     gap: '3px',
                     alignItems: 'flex-end',
                     paddingBottom: '12px',
+                    minHeight: '248px',
                   }}
                 >
-                  {books.map((book, i) => (
+                  {booksThisYear.map((book, i) => (
                     <BookSpine key={book.id} book={book} index={i} />
                   ))}
                 </div>

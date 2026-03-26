@@ -41,6 +41,7 @@ export function BookDetailScreen() {
   const [readingNotes, setReadingNotes] = useState('');
   const [quotes, setQuotes] = useState<string[]>(['']);
   const [bookQuery, setBookQuery] = useState('');
+  const [bookReadDate, setBookReadDate] = useState('');
   const [bookResults, setBookResults] = useState<BookSearchResult[]>([]);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const bookDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,18 +54,21 @@ export function BookDetailScreen() {
       if (b) {
         setBook(b);
         setLinkedMemories(mems);
-        resetEditState(b);
+        resetEditState(b, mems);
       }
     }).catch(console.error).finally(() => setLoading(false));
   }, [id]);
 
-  function resetEditState(b: Book) {
+  function resetEditState(b: Book, mems?: LinkedMemory[]) {
     setBookTitle(b.title);
     setBookAuthor(b.author);
     setBookCoverUrl(b.cover_url);
     setBookCoverPreview(b.cover_url);
     setBookCoverFile(null);
     setReadingNotes(b.reading_notes ?? '');
+    // Pre-fill read_date: use explicit value if set, else earliest linked memory date
+    const fallback = (mems ?? linkedMemories)[0]?.memory?.date ?? '';
+    setBookReadDate(b.read_date ?? fallback);
     setQuotes(b.quotes.length > 0 ? b.quotes.map((q) => q.content) : ['']);
     setBookQuery('');
     setBookResults([]);
@@ -111,6 +115,7 @@ export function BookDetailScreen() {
         coverUrl: bookCoverUrl,
         coverFile: bookCoverFile ?? undefined,
         readingNotes: readingNotes.trim() || undefined,
+        readDate: bookReadDate || null,
       }, filledQuotes);
       const updated = await getBookById(book.id);
       if (updated) setBook(updated);
@@ -230,6 +235,10 @@ export function BookDetailScreen() {
                   <span style={{ color: 'var(--ink-faint)', fontSize: '0.7rem', textAlign: 'center', padding: '4px' }}>上传封面</span>
                 </div>
               )}
+            </div>
+            <div>
+              <label style={labelStyle}>读完于</label>
+              <input type="date" value={bookReadDate} onChange={(e) => setBookReadDate(e.target.value)} style={inputStyle} />
             </div>
             <div>
               <label style={labelStyle}>读书笔记（可选）</label>
