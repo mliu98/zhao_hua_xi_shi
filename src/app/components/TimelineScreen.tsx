@@ -19,6 +19,7 @@ function MemoryThumbnail({ memory }: { memory: Memory }) {
       <img
         src={memory.photo.images[0].image_url}
         alt={memory.photo.caption ?? '照片'}
+        loading="lazy"
         style={thumbStyle}
       />
     );
@@ -30,6 +31,7 @@ function MemoryThumbnail({ memory }: { memory: Memory }) {
         <img
           src={memory.note.images[0].image_url}
           alt="手写笔记"
+          loading="lazy"
           style={thumbStyle}
         />
       );
@@ -66,6 +68,7 @@ function MemoryThumbnail({ memory }: { memory: Memory }) {
         <img
           src={memory.book.cover_url}
           alt={memory.book.title}
+          loading="lazy"
           style={thumbStyle}
         />
       );
