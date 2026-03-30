@@ -58,6 +58,7 @@ export function AddMemoryScreen() {
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ uploaded: number; total: number } | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -148,10 +149,11 @@ export function AddMemoryScreen() {
     if (type === 'book' && !bookTitle.trim()) { setError('请输入书名'); return; }
 
     setSaving(true);
+    setUploadProgress(null);
     setError('');
     try {
       if (type === 'photo') {
-        await createPhotoMemory(locationId, date, imageFiles, caption || undefined);
+        await createPhotoMemory(locationId, date, imageFiles, caption || undefined, (uploaded, total) => setUploadProgress({ uploaded, total }));
         navigate(`/location/${locationId}`);
       } else if (type === 'note') {
         await createNoteMemory(locationId, date, noteSubtype, noteContent || undefined, imageFiles.length > 0 ? imageFiles : undefined);
@@ -178,6 +180,7 @@ export function AddMemoryScreen() {
       console.error(err);
     } finally {
       setSaving(false);
+      setUploadProgress(null);
     }
   }
 
@@ -400,7 +403,7 @@ export function AddMemoryScreen() {
 
           <div className="pt-4">
             <button type="submit" disabled={saving} style={{ width: '100%', padding: '14px', background: 'var(--ink-text)', color: 'var(--paper-warm)', fontSize: '0.875rem', fontFamily: 'var(--font-serif)', border: 'none', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>
-              {saving ? '保存中…' : '保存記憶'}
+              {uploadProgress ? `上传中（${uploadProgress.uploaded}/${uploadProgress.total}）…` : saving ? '保存中…' : '保存記憶'}
             </button>
           </div>
         </form>

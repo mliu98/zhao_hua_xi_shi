@@ -75,7 +75,8 @@ export async function createPhotoMemory(
   locationId: string,
   date: string,
   imageFiles: File[],
-  caption?: string
+  caption?: string,
+  onProgress?: (uploaded: number, total: number) => void
 ): Promise<Memory> {
   const { data: memory, error: memError } = await supabase
     .from('memories')
@@ -91,13 +92,15 @@ export async function createPhotoMemory(
 
   if (photoError) throw photoError
 
-  const uploadedImages = await Promise.all(
-    imageFiles.map(async (file, i) => {
-      const path = `photos/${memory.id}-${i}-${file.name.replace(/\s+/g, '_')}`
-      const imageUrl = await uploadImage(file, path)
-      return { memory_id: memory.id, image_url: imageUrl, order: i }
-    })
-  )
+  const uploadedImages: { memory_id: string; image_url: string; order: number }[] = []
+  for (let i = 0; i < imageFiles.length; i++) {
+    const file = imageFiles[i]
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `photos/${memory.id}-${i}-${safeName}`
+    const imageUrl = await uploadImage(file, path)
+    uploadedImages.push({ memory_id: memory.id, image_url: imageUrl, order: i })
+    onProgress?.(i + 1, imageFiles.length)
+  }
 
   const { error: imgError } = await supabase.from('photo_images').insert(uploadedImages)
   if (imgError) throw imgError
@@ -234,6 +237,16 @@ export async function updateNoteMemory(
     const { error } = await supabase.from('note_images').insert(uploaded)
     if (error) throw error
   }
+}
+
+export async function deleteMemory(memoryId: string): Promise<void> {
+  await supabase.from('photo_images').delete().eq('memory_id', memoryId)
+  await supabase.from('memory_photos').delete().eq('memory_id', memoryId)
+  await supabase.from('note_images').delete().eq('memory_id', memoryId)
+  await supabase.from('memory_notes').delete().eq('memory_id', memoryId)
+  await supabase.from('memory_books').delete().eq('memory_id', memoryId)
+  const { error } = await supabase.from('memories').delete().eq('id', memoryId)
+  if (error) throw error
 }
 
 export async function updateBookMemory(

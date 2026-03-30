@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router';
+import { useParams, Link, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getMemoryById } from '../../lib/memoryService';
+import { getMemoryById, deleteMemory } from '../../lib/memoryService';
 import type { Memory } from '../../lib/types';
 
 function ImageGallery({ urls, border }: { urls: string[]; border?: string }) {
@@ -67,8 +67,10 @@ function ImageGallery({ urls, border }: { urls: string[]; border?: string }) {
 
 export function MemoryDetailScreen() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [memory, setMemory] = useState<Memory | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     getMemoryById(id!).then(setMemory).catch(console.error).finally(() => setLoading(false));
@@ -92,6 +94,18 @@ export function MemoryDetailScreen() {
 
   const locationName = (memory as any).location?.name ?? '';
 
+  async function handleDelete() {
+    if (!confirm('确定要删除这条记忆吗？')) return;
+    setDeleting(true);
+    try {
+      await deleteMemory(memory!.id);
+      navigate(memory!.location_id ? `/location/${memory!.location_id}` : '/');
+    } catch (err) {
+      console.error(err);
+      setDeleting(false);
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -110,13 +124,23 @@ export function MemoryDetailScreen() {
           <ArrowLeft size={16} />
           {locationName}
         </Link>
-        <Link
-          to={`/memory/${memory.id}/edit`}
-          style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textDecoration: 'none' }}
-          className="hover:opacity-70 transition-opacity"
-        >
-          编辑
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            to={`/memory/${memory.id}/edit`}
+            style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textDecoration: 'none' }}
+            className="hover:opacity-70 transition-opacity"
+          >
+            编辑
+          </Link>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            style={{ background: 'none', border: 'none', cursor: deleting ? 'default' : 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)', opacity: deleting ? 0.5 : 1, padding: 0 }}
+            className="hover:opacity-70 transition-opacity"
+          >
+            {deleting ? '删除中…' : '删除'}
+          </button>
+        </div>
       </div>
 
       {/* Content */}
