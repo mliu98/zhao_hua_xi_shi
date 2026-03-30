@@ -3,61 +3,88 @@ import { useParams, Link, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getMemoryById, deleteMemory } from '../../lib/memoryService';
-import type { Memory } from '../../lib/types';
+import type { Memory, PhotoImage } from '../../lib/types';
 
-function ImageGallery({ urls, border }: { urls: string[]; border?: string }) {
+function ImageGallery({ items }: { items: Pick<PhotoImage, 'image_url' | 'video_url' | 'media_type'>[] }) {
   const [index, setIndex] = useState(0);
   const [zoomed, setZoomed] = useState(false);
+  const [playingVideo, setPlayingVideo] = useState(false);
 
-  if (urls.length === 0) return null;
+  if (items.length === 0) return null;
+
+  const current = items[index];
+  const isVideo = current.media_type === 'video' && !!current.video_url;
+
+  function handleNext(e: React.MouseEvent) {
+    e.stopPropagation();
+    setPlayingVideo(false);
+    setIndex((i) => (i + 1) % items.length);
+  }
+
+  function handlePrev(e: React.MouseEvent) {
+    e.stopPropagation();
+    setPlayingVideo(false);
+    setIndex((i) => (i - 1 + items.length) % items.length);
+  }
 
   return (
     <div>
       <div style={{ position: 'relative' }}>
         <div
-          className="overflow-hidden cursor-zoom-in"
           style={{
-            boxShadow: '0 4px 16px var(--paper-shadow)',
-            border: border ?? 'none',
             transform: zoomed ? 'scale(1.5)' : 'scale(1)',
             transition: 'transform 0.4s ease',
+            cursor: isVideo ? 'default' : 'zoom-in',
+            overflow: 'hidden',
           }}
-          onClick={() => setZoomed(!zoomed)}
+          onClick={() => { if (!isVideo) setZoomed((z) => !z); }}
         >
-          <img
-            src={urls[index]}
-            alt=""
-            className="w-full"
-            style={{ display: 'block', filter: 'contrast(0.92) saturate(0.85)' }}
-          />
+          {isVideo && playingVideo ? (
+            <video
+              src={current.video_url!}
+              className="w-full"
+              style={{ display: 'block' }}
+              controls
+              autoPlay
+            />
+          ) : (
+            <div style={{ position: 'relative' }}>
+              <img
+                src={current.image_url}
+                alt=""
+                className="w-full"
+                style={{ display: 'block', filter: 'contrast(0.92) saturate(0.85)' }}
+              />
+              {isVideo && !playingVideo && (
+                <div
+                  style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); setPlayingVideo(true); }}
+                >
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(58,54,50,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="20" height="24" viewBox="0 0 10 12" fill="white"><polygon points="0,0 10,6 0,12"/></svg>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {urls.length > 1 && !zoomed && (
+        {items.length > 1 && !zoomed && (
           <>
-            <button
-              onClick={(e) => { e.stopPropagation(); setIndex((i) => (i - 1 + urls.length) % urls.length); }}
-              style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
-            >
+            <button onClick={handlePrev} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
               <ChevronLeft size={16} color="white" />
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setIndex((i) => (i + 1) % urls.length); }}
-              style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
-            >
+            <button onClick={handleNext} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
               <ChevronRight size={16} color="white" />
             </button>
           </>
         )}
       </div>
 
-      {urls.length > 1 && (
+      {items.length > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '10px' }}>
-          {urls.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setIndex(i)}
-              style={{ width: '6px', height: '6px', borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: i === index ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: i === index ? 1 : 0.4 }}
-            />
+          {items.map((_, i) => (
+            <button key={i} onClick={() => { setIndex(i); setPlayingVideo(false); }} style={{ width: '6px', height: '6px', borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: i === index ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: i === index ? 1 : 0.4 }} />
           ))}
         </div>
       )}
@@ -195,16 +222,18 @@ export function MemoryDetailScreen() {
     }
   }
 
+  const isPhoto = memory.type === 'photo';
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.8 }}
-      className="min-h-screen p-6 flex flex-col"
+      className="min-h-screen flex flex-col"
       style={{ fontFamily: 'var(--font-serif)' }}
     >
       {/* Header */}
-      <div className="max-w-3xl mx-auto w-full mb-8 flex items-center justify-between">
+      <div className="max-w-3xl mx-auto w-full flex items-center justify-between" style={{ padding: '24px 24px 0' }}>
         <Link
           to={`/location/${memory.location_id}`}
           style={{ color: 'var(--ink-light)', fontSize: '0.875rem' }}
@@ -233,17 +262,17 @@ export function MemoryDetailScreen() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center" style={{ padding: '24px 12px' }}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.8 }}
           className="w-full"
-          style={{ maxWidth: memory.type === 'note' && memory.note?.note_type === 'handwritten' ? '900px' : '576px' }}
+          style={{ maxWidth: memory.type === 'note' && memory.note?.note_type === 'handwritten' ? '900px' : isPhoto ? '800px' : '576px' }}
         >
           {/* Photo */}
           {memory.type === 'photo' && memory.photo && (
-            <ImageGallery urls={memory.photo.images.map((i) => i.image_url)} />
+            <ImageGallery items={memory.photo.images} />
           )}
 
           {/* Note: handwritten */}
@@ -301,7 +330,8 @@ export function MemoryDetailScreen() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6, duration: 0.8 }}
-        className="max-w-3xl mx-auto w-full mt-8 text-center"
+        className="max-w-3xl mx-auto w-full text-center"
+        style={{ padding: '0 12px 32px' }}
       >
         {memory.type === 'photo' && memory.photo?.caption && (
           <p style={{ color: 'var(--ink-text)', fontSize: '0.9rem', marginBottom: '8px' }}>{memory.photo.caption}</p>

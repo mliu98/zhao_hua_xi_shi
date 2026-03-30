@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, Minus, Plus, X } from 'lucide-react';
-import { getBookById, updateBook, deleteBook, getLinkedMemories } from '../../lib/bookService';
+import { getBookById, updateBook, deleteBook, getLinkedMemories, updateBookLocation } from '../../lib/bookService';
 import { searchBooks } from '../../lib/bookSearchService';
 import type { BookSearchResult } from '../../lib/bookSearchService';
 import { AnimatePresence } from 'motion/react';
 import { useRef } from 'react';
-import type { Book } from '../../lib/types';
+import type { Book, Location } from '../../lib/types';
+import { LocationPickerSheet } from './LocationPickerSheet';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 0', background: 'transparent', border: 'none',
@@ -33,6 +34,7 @@ export function BookDetailScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   // Edit state
   const [bookTitle, setBookTitle] = useState('');
@@ -103,6 +105,18 @@ export function BookDetailScreen() {
     setBookCoverUrl(null);
     setBookCoverPreview(URL.createObjectURL(file));
     e.target.value = '';
+  }
+
+  async function handleSelectLocation(loc: Location) {
+    if (!book) return;
+    await updateBookLocation(book.id, loc.id);
+    setBook({ ...book, location_id: loc.id, location: loc });
+  }
+
+  async function handleRemoveLocation() {
+    if (!book) return;
+    await updateBookLocation(book.id, null);
+    setBook({ ...book, location_id: null, location: undefined });
   }
 
   async function handleSave() {
@@ -339,6 +353,45 @@ export function BookDetailScreen() {
               </div>
             </div>
 
+            {/* Location */}
+            {(() => {
+              const directLoc = book.location;
+              const fallbackLoc = !directLoc ? linkedMemories[0]?.memory?.location : null;
+              if (directLoc) {
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '28px' }}>
+                    <Link
+                      to={`/location/${book.location_id}`}
+                      style={{ color: 'var(--ink-light)', fontSize: '0.85rem', textDecoration: 'none' }}
+                      className="hover:opacity-70 transition-opacity"
+                    >
+                      {directLoc.name}
+                    </Link>
+                    <button onClick={() => setShowLocationPicker(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.75rem', fontFamily: 'var(--font-serif)', padding: 0 }} className="hover:opacity-70 transition-opacity">
+                      更改
+                    </button>
+                    <button onClick={handleRemoveLocation} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.75rem', fontFamily: 'var(--font-serif)', padding: 0 }} className="hover:opacity-70 transition-opacity">
+                      移除
+                    </button>
+                  </div>
+                );
+              }
+              if (fallbackLoc) {
+                return (
+                  <div style={{ marginBottom: '28px' }}>
+                    <span style={{ color: 'var(--ink-light)', fontSize: '0.85rem' }}>{fallbackLoc.name}</span>
+                  </div>
+                );
+              }
+              return (
+                <div style={{ marginBottom: '28px' }}>
+                  <button onClick={() => setShowLocationPicker(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)', padding: 0 }} className="hover:opacity-70 transition-opacity">
+                    + 添加阅读地点
+                  </button>
+                </div>
+              );
+            })()}
+
             {book.reading_notes && (
               <div style={{ marginBottom: '36px' }}>
                 <p style={{ color: 'var(--ink-text)', fontSize: '0.9rem', lineHeight: '1.9', margin: 0, whiteSpace: 'pre-wrap' }}>
@@ -383,6 +436,13 @@ export function BookDetailScreen() {
           </motion.div>
         )}
       </div>
+
+      <LocationPickerSheet
+        open={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        onSelect={handleSelectLocation}
+        currentLocationId={book?.location_id}
+      />
     </motion.div>
   );
 }
