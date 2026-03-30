@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -59,6 +59,95 @@ function ImageGallery({ urls, border }: { urls: string[]; border?: string }) {
               style={{ width: '6px', height: '6px', borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: i === index ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: i === index ? 1 : 0.4 }}
             />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BookSpread({ urls }: { urls: string[] }) {
+  const [spreadIndex, setSpreadIndex] = useState(0); // index of left-page image
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640);
+  const leftRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  if (urls.length === 0) return null;
+
+  const totalSpreads = Math.ceil(urls.length / 2);
+  const canPrev = spreadIndex > 0;
+  const canNext = spreadIndex + 2 < urls.length || (urls.length % 2 === 1 && spreadIndex + 1 < urls.length);
+
+  const leftUrl = urls[spreadIndex] ?? null;
+  const rightUrl = urls[spreadIndex + 1] ?? null;
+
+  // Mobile: single image fallback
+  if (isMobile) {
+    return (
+      <div>
+        <div style={{ position: 'relative', boxShadow: '0 4px 16px var(--paper-shadow)', border: '4px solid var(--paper-warm)' }}>
+          <img src={leftUrl} alt="" className="w-full" style={{ display: 'block', filter: 'contrast(0.92) saturate(0.85)' }} />
+          {urls.length > 1 && (
+            <>
+              <button onClick={() => setSpreadIndex((i) => Math.max(0, i - 1))} disabled={!canPrev} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: canPrev ? 1 : 0.3 }}>
+                <ChevronLeft size={16} color="white" />
+              </button>
+              <button onClick={() => setSpreadIndex((i) => Math.min(urls.length - 1, i + 1))} disabled={!canNext} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: canNext ? 1 : 0.3 }}>
+                <ChevronRight size={16} color="white" />
+              </button>
+            </>
+          )}
+        </div>
+        {urls.length > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '10px' }}>
+            {urls.map((_, i) => (
+              <button key={i} onClick={() => setSpreadIndex(i)} style={{ width: '6px', height: '6px', borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: i === spreadIndex ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: i === spreadIndex ? 1 : 0.4 }} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop: double-page spread
+  return (
+    <div>
+      <div style={{ boxShadow: '0 4px 24px var(--paper-shadow)', border: '4px solid var(--paper-warm)', display: 'grid', gridTemplateColumns: '1fr 6px 1fr', alignItems: 'stretch' }}>
+        {/* Left page */}
+        <img ref={leftRef} src={leftUrl} alt="" style={{ display: 'block', width: '100%', filter: 'contrast(0.92) saturate(0.85)' }} />
+
+        {/* Spine */}
+        <div style={{
+          background: 'linear-gradient(to right, rgba(58,54,50,0.18), rgba(58,54,50,0.06) 40%, rgba(58,54,50,0.06) 60%, rgba(58,54,50,0.18))',
+          boxShadow: 'inset -1px 0 3px rgba(58,54,50,0.12), inset 1px 0 3px rgba(58,54,50,0.12)',
+        }} />
+
+        {/* Right page — blank if no image */}
+        {rightUrl ? (
+          <img src={rightUrl} alt="" style={{ display: 'block', width: '100%', filter: 'contrast(0.92) saturate(0.85)' }} />
+        ) : (
+          <div style={{ background: 'var(--paper-warm)', minHeight: leftRef.current?.offsetHeight ?? 200 }} />
+        )}
+      </div>
+
+      {/* Navigation */}
+      {totalSpreads > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', marginTop: '14px' }}>
+          <button onClick={() => setSpreadIndex((i) => Math.max(0, i - 2))} disabled={!canPrev} style={{ background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: canPrev ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: canPrev ? 1 : 0.3 }}>
+            <ChevronLeft size={16} color="white" />
+          </button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {Array.from({ length: totalSpreads }).map((_, i) => (
+              <button key={i} onClick={() => setSpreadIndex(i * 2)} style={{ width: '6px', height: '6px', borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: Math.floor(spreadIndex / 2) === i ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: Math.floor(spreadIndex / 2) === i ? 1 : 0.4 }} />
+            ))}
+          </div>
+          <button onClick={() => setSpreadIndex((i) => Math.min(urls.length % 2 === 0 ? urls.length - 2 : urls.length - 1, i + 2))} disabled={!canNext} style={{ background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: canNext ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: canNext ? 1 : 0.3 }}>
+            <ChevronRight size={16} color="white" />
+          </button>
         </div>
       )}
     </div>
@@ -149,7 +238,8 @@ export function MemoryDetailScreen() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.8 }}
-          className="max-w-xl w-full"
+          className="w-full"
+          style={{ maxWidth: memory.type === 'note' && memory.note?.note_type === 'handwritten' ? '900px' : '576px' }}
         >
           {/* Photo */}
           {memory.type === 'photo' && memory.photo && (
@@ -159,7 +249,7 @@ export function MemoryDetailScreen() {
           {/* Note: handwritten */}
           {memory.type === 'note' && memory.note?.note_type === 'handwritten' && memory.note.images.length > 0 && (
             <div>
-              <ImageGallery urls={memory.note.images.map((i) => i.image_url)} border="4px solid var(--paper-warm)" />
+              <BookSpread urls={memory.note.images.map((i) => i.image_url)} />
               {memory.note.content && (
                 <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', marginTop: '16px', textAlign: 'center', fontStyle: 'italic' }}>
                   {memory.note.content}
