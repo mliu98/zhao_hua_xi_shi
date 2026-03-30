@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { getLocations, createLocation, searchByName } from '../../lib/locationService';
-import type { Location, NominatimResult } from '../../lib/types';
+import { getMemoriesByLocation } from '../../lib/memoryService';
+import type { Location, Memory, NominatimResult } from '../../lib/types';
 
 // Fix Leaflet default icon missing in Vite builds
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -22,6 +23,100 @@ const inkIcon = new L.DivIcon({
   iconAnchor: [5, 5],
 });
 
+function pickRandom<T>(arr: T[]): T | null {
+  return arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
+}
+
+function getTextSnippet(memories: Memory[]): string | null {
+  const snippets: string[] = [];
+  for (const m of memories) {
+    if (m.type === 'note' && m.note?.note_type === 'text' && m.note.content) snippets.push(m.note.content);
+    if (m.type === 'note' && m.note?.note_type === 'handwritten' && m.note.content) snippets.push(m.note.content);
+    if (m.type === 'book' && m.book?.reading_notes) snippets.push(m.book.reading_notes);
+    if (m.type === 'book' && m.book?.quotes) m.book.quotes.forEach((q) => snippets.push(q.content));
+  }
+  const pick = pickRandom(snippets);
+  if (!pick) return null
+  // Take up to first 2 sentences, max 50 chars
+  const sentences = pick.match(/[^。！？.!?]+[。！？.!?]*/g) ?? [pick]
+  const short = sentences.slice(0, 2).join('').trim()
+  return short.length > 50 ? short.slice(0, 50) + '…' : short;
+}
+
+function getRandomPhoto(memories: Memory[]): string | null {
+  const urls: string[] = [];
+  for (const m of memories) {
+    if (m.type === 'photo' && m.photo?.images) m.photo.images.forEach((i) => urls.push(i.image_url));
+    if (m.type === 'note' && m.note?.images) m.note.images.forEach((i) => urls.push(i.image_url));
+    if (m.type === 'book' && m.book?.cover_url) urls.push(m.book.cover_url);
+  }
+  return pickRandom(urls);
+}
+
+function LocationMarker({
+  location,
+  cache,
+  onLoad,
+  onNavigate,
+}: {
+  location: Location;
+  cache: Record<string, Memory[]>;
+  onLoad: (id: string, memories: Memory[]) => void;
+  onNavigate: (id: string) => void;
+}) {
+  const markerRef = useRef<L.Marker>(null);
+
+  async function handleMouseOver() {
+    if (!cache[location.id]) {
+      const memories = await getMemoriesByLocation(location.id).catch(() => []);
+      onLoad(location.id, memories);
+    }
+    markerRef.current?.openPopup();
+  }
+
+  function handleMouseOut() {
+    markerRef.current?.closePopup();
+  }
+
+  const memories = cache[location.id] ?? [];
+  const photo = getRandomPhoto(memories);
+  const snippet = getTextSnippet(memories);
+  const count = memories.length;
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={[location.lat, location.lng]}
+      icon={inkIcon}
+      eventHandlers={{
+        mouseover: handleMouseOver,
+        mouseout: handleMouseOut,
+        click: () => onNavigate(location.id),
+      }}
+    >
+      <Popup closeButton={false} autoPan={false} offset={[0, -6]}>
+        <div style={{ fontFamily: 'var(--font-serif)', width: '180px', padding: '2px' }}>
+          {photo && (
+            <img
+              src={photo}
+              alt=""
+              style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block', marginBottom: '10px', filter: 'contrast(0.92) saturate(0.85)' }}
+            />
+          )}
+          {snippet && (
+            <p style={{ color: 'var(--ink-light)', fontSize: '0.75rem', lineHeight: 1.7, margin: '0 0 8px', fontStyle: 'italic' }}>
+              {snippet}
+            </p>
+          )}
+          <p style={{ color: 'var(--ink-faint)', fontSize: '0.7rem', margin: 0 }}>
+            {count === 0 ? '还没有记忆' : `${count} 条记忆`}
+          </p>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
 function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
@@ -33,6 +128,7 @@ function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number
 
 export function MapScreen() {
   const [locations, setLocations] = useState<Location[]>([]);
+  const [memoriesCache, setMemoriesCache] = useState<Record<string, Memory[]>>({});
   const [pending, setPending] = useState<{ lat: number; lng: number } | null>(null);
   const [locationName, setLocationName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,28 +184,7 @@ export function MapScreen() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8 }}
-      className="min-h-screen flex flex-col"
-      style={{ fontFamily: 'var(--font-serif)' }}
-    >
-      {/* Title */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.8 }}
-        className="text-center py-8 px-6"
-      >
-        <h1 className="mb-2" style={{ color: 'var(--ink-text)', fontSize: '1.75rem', fontWeight: 400, letterSpacing: '0.02em' }}>
-          朝花夕拾
-        </h1>
-        <p style={{ color: 'var(--ink-light)', fontSize: '0.875rem', fontWeight: 400 }}>
-          Dawn Blossoms Plucked at Dusk
-        </p>
-      </motion.div>
-
+    <div className="flex flex-col flex-1" style={{ fontFamily: 'var(--font-serif)' }}>
       {/* Search */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -200,13 +275,12 @@ export function MapScreen() {
             />
             <MapClickHandler onMapClick={handleMapClick} />
             {locations.map((location) => (
-              <Marker
+              <LocationMarker
                 key={location.id}
-                position={[location.lat, location.lng]}
-                icon={inkIcon}
-                eventHandlers={{
-                  click: () => window.location.href = `/location/${location.id}`,
-                }}
+                location={location}
+                cache={memoriesCache}
+                onLoad={(id, mems) => setMemoriesCache((prev) => ({ ...prev, [id]: mems }))}
+                onNavigate={(id) => { window.location.href = `/location/${id}`; }}
               />
             ))}
           </MapContainer>
@@ -289,6 +363,6 @@ export function MapScreen() {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }

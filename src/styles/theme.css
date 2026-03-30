@@ -2,17 +2,17 @@
 
 :root {
   /* Typography */
-  --font-serif: 'Crimson Text', 'Lora', Georgia, serif;
+  --font-serif: 'LXGW WenKai', 'Crimson Text', 'Lora', Georgia, serif;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  
+
   /* Paper-like colors */
-  --paper-background: #f8f6f1;
-  --paper-bg: #f8f6f1;
-  --paper-warm: #faf8f3;
-  --ink-text: #3a3632;
-  --ink-light: #6b6561;
-  --ink-faint: #9a958f;
-  --paper-shadow: rgba(58, 54, 50, 0.08);
+  --paper-background: #f5f2eb;
+  --paper-bg: #f5f2eb;
+  --paper-warm: #f9f6ef;
+  --ink-text: #322e2a;
+  --ink-light: #635e59;
+  --ink-faint: #9a948d;
+  --paper-shadow: rgba(50, 46, 42, 0.13);
   
   /* Original theme variables */
   --font-size: 16px;

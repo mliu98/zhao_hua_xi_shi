@@ -15,33 +15,51 @@ export interface Memory {
   // joined from sub-tables
   photo?: MemoryPhoto
   note?: MemoryNote
-  book?: MemoryBook & { quotes: BookQuote[] }
+  book?: Book
+}
+
+export interface PhotoImage {
+  id: string
+  memory_id: string
+  image_url: string
+  order: number
+}
+
+export interface NoteImage {
+  id: string
+  memory_id: string
+  image_url: string
+  order: number
 }
 
 export interface MemoryPhoto {
   memory_id: string
-  image_url: string
   caption: string | null
+  images: PhotoImage[]
 }
 
 export interface MemoryNote {
   memory_id: string
   note_type: 'handwritten' | 'text'
-  image_url: string | null
   content: string | null
+  images: NoteImage[]
 }
 
-export interface MemoryBook {
-  memory_id: string
+export interface Book {
+  id: string
   title: string
   author: string
   cover_url: string | null
   reading_notes: string | null
+  read_date: string | null
+  created_at: string
+  quotes: BookQuote[]
+  memoryDates?: string[] // linked memory dates, used for year filtering
 }
 
 export interface BookQuote {
   id: string
-  memory_id: string
+  book_id: string
   content: string
   order: number
 }
