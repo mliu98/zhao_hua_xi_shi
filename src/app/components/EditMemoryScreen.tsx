@@ -3,8 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, X, Plus, Minus } from 'lucide-react';
 import { getMemoryById, updatePhotoMemory, updateNoteMemory, updateBookMemory } from '../../lib/memoryService';
+import { getLocations, updateLocationParent } from '../../lib/locationService';
 // BookData re-exported from memoryService for backwards compat
-import type { Memory, PhotoImage, NoteImage } from '../../lib/types';
+import type { Memory, PhotoImage, NoteImage, Location } from '../../lib/types';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 0', background: 'transparent', border: 'none',
@@ -21,6 +22,7 @@ export function EditMemoryScreen() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [memory, setMemory] = useState<Memory | null>(null);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -55,6 +57,7 @@ export function EditMemoryScreen() {
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    getLocations().then(setLocations).catch(console.error);
     getMemoryById(id!).then((m) => {
       if (!m) return;
       setMemory(m);
@@ -305,6 +308,31 @@ export function EditMemoryScreen() {
               </div>
             </>
           )}
+
+          {/* Parent location management */}
+          {memory.location_id && (() => {
+            const selected = locations.find((l) => l.id === memory.location_id);
+            if (!selected) return null;
+            return (
+              <div>
+                <label style={labelStyle}>「{selected.name}」的上属地点（可选）</label>
+                <select
+                  value={selected.parent_id ?? ''}
+                  onChange={async (e) => {
+                    const newParentId = e.target.value || null;
+                    await updateLocationParent(memory.location_id, newParentId).catch(console.error);
+                    setLocations((prev) => prev.map((l) => l.id === memory.location_id ? { ...l, parent_id: newParentId } : l));
+                  }}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                >
+                  <option value="">无</option>
+                  {locations.filter((l) => l.id !== memory.location_id).map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
 
           {/* Date */}
           <div>

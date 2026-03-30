@@ -39,6 +39,18 @@ const MEMORY_SELECT = `
   book_link:memory_books(book:books(*, quotes:book_quotes(*)))
 `
 
+export async function getMemoriesByLocationTree(locationIds: string[]): Promise<Memory[]> {
+  if (locationIds.length === 0) return []
+  const { data, error } = await supabase
+    .from('memories')
+    .select(`${MEMORY_SELECT}, location:locations(name)`)
+    .in('location_id', locationIds)
+    .order('date', { ascending: false })
+
+  if (error) throw error
+  return (data as any[]).map(normalizeMemory) as Memory[]
+}
+
 export async function getMemoriesByLocation(locationId: string): Promise<Memory[]> {
   const { data, error } = await supabase
     .from('memories')
