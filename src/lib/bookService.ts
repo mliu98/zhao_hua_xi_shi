@@ -11,7 +11,7 @@ export interface BookData {
   readDate?: string | null
 }
 
-const BOOK_SELECT = `*, quotes:book_quotes(*), memory_books(memory:memories(date))`
+const BOOK_SELECT = `*, quotes:book_quotes(*), memory_books(memory:memories(date)), location:locations(*)`
 
 export async function getAllBooks(): Promise<Book[]> {
   const { data, error } = await supabase
@@ -150,10 +150,26 @@ function yearOf(dateStr: string): number {
   return parseInt(dateStr.slice(0, 4), 10)
 }
 
+export async function updateBookLocation(bookId: string, locationId: string | null): Promise<void> {
+  const { error } = await supabase.from('books').update({ location_id: locationId }).eq('id', bookId)
+  if (error) throw error
+}
+
+export async function getBooksByLocationIds(locationIds: string[]): Promise<Book[]> {
+  if (locationIds.length === 0) return []
+  const { data, error } = await supabase
+    .from('books')
+    .select(BOOK_SELECT)
+    .in('location_id', locationIds)
+  if (error) throw error
+  return (data as any[]).map(normalizeBook) as Book[]
+}
+
 function normalizeBook(raw: any): Book {
   const quotes = Array.isArray(raw.quotes) ? raw.quotes.sort((a: any, b: any) => a.order - b.order) : []
   const memoryDates = Array.isArray(raw.memory_books)
     ? raw.memory_books.map((mb: any) => mb.memory?.date).filter(Boolean) as string[]
     : []
-  return { ...raw, quotes, memoryDates, memory_books: undefined }
+  const location = raw.location ?? undefined
+  return { ...raw, quotes, memoryDates, location, memory_books: undefined }
 }
