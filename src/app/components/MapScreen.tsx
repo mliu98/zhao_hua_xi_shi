@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { getLocations, createLocation, searchByName } from '../../lib/locationService';
+import { getLocations, createLocation, searchByName, suggestParentFromDisplayName } from '../../lib/locationService';
 import { getMemoriesByLocation } from '../../lib/memoryService';
 import type { Location, Memory, NominatimResult } from '../../lib/types';
 
@@ -21,6 +21,14 @@ const inkIcon = new L.DivIcon({
   html: `<div style="width:10px;height:10px;border-radius:50%;background:#3a3632;opacity:0.75;box-shadow:0 0 0 4px rgba(58,54,50,0.15)"></div>`,
   iconSize: [10, 10],
   iconAnchor: [5, 5],
+});
+
+// Hollow marker for parent locations (those that have children)
+const parentInkIcon = new L.DivIcon({
+  className: '',
+  html: `<div style="width:14px;height:14px;border-radius:50%;background:transparent;border:2px solid rgba(58,54,50,0.75);box-shadow:0 0 0 4px rgba(58,54,50,0.1)"></div>`,
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
 });
 
 function pickRandom<T>(arr: T[]): T | null {
@@ -55,11 +63,13 @@ function getRandomPhoto(memories: Memory[]): string | null {
 
 function LocationMarker({
   location,
+  isParent,
   cache,
   onLoad,
   onNavigate,
 }: {
   location: Location;
+  isParent: boolean;
   cache: Record<string, Memory[]>;
   onLoad: (id: string, memories: Memory[]) => void;
   onNavigate: (id: string) => void;
@@ -87,7 +97,7 @@ function LocationMarker({
     <Marker
       ref={markerRef}
       position={[location.lat, location.lng]}
-      icon={inkIcon}
+      icon={isParent ? parentInkIcon : inkIcon}
       eventHandlers={{
         mouseover: handleMouseOver,
         mouseout: handleMouseOut,
@@ -131,6 +141,8 @@ export function MapScreen() {
   const [memoriesCache, setMemoriesCache] = useState<Record<string, Memory[]>>({});
   const [pending, setPending] = useState<{ lat: number; lng: number } | null>(null);
   const [locationName, setLocationName] = useState('');
+  const [parentId, setParentId] = useState<string>('');
+  const [suggestedParent, setSuggestedParent] = useState<Location | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
   const [saving, setSaving] = useState(false);
@@ -148,6 +160,8 @@ export function MapScreen() {
   function handleMapClick(lat: number, lng: number) {
     setPending({ lat, lng });
     setLocationName('');
+    setParentId('');
+    setSuggestedParent(null);
   }
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -165,6 +179,9 @@ export function MapScreen() {
     setSearchResults([]);
     setPending({ lat: result.lat, lng: result.lng });
     setLocationName(result.name);
+    setParentId('');
+    const suggested = suggestParentFromDisplayName(result.displayName, locations);
+    setSuggestedParent(suggested);
     setTimeout(() => nameInputRef.current?.focus(), 50);
   }
 
@@ -172,10 +189,13 @@ export function MapScreen() {
     if (!pending || !locationName.trim()) return;
     setSaving(true);
     try {
-      const newLocation = await createLocation(locationName.trim(), pending.lat, pending.lng);
+      const resolvedParentId = parentId || (suggestedParent ? suggestedParent.id : null);
+      const newLocation = await createLocation(locationName.trim(), pending.lat, pending.lng, resolvedParentId);
       setLocations((prev) => [...prev, newLocation]);
       setPending(null);
       setLocationName('');
+      setParentId('');
+      setSuggestedParent(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -278,6 +298,7 @@ export function MapScreen() {
               <LocationMarker
                 key={location.id}
                 location={location}
+                isParent={locations.some((l) => l.parent_id === location.id)}
                 cache={memoriesCache}
                 onLoad={(id, mems) => setMemoriesCache((prev) => ({ ...prev, [id]: mems }))}
                 onNavigate={(id) => { window.location.href = `/location/${id}`; }}
@@ -334,9 +355,33 @@ export function MapScreen() {
                   width: '100%', padding: '6px 0', background: 'transparent',
                   border: 'none', borderBottom: '1px solid var(--ink-faint)',
                   color: 'var(--ink-text)', fontSize: '1rem', fontFamily: 'var(--font-serif)',
-                  outline: 'none', marginBottom: '24px',
+                  outline: 'none', marginBottom: '20px',
                 }}
               />
+              {/* Nominatim parent suggestion */}
+              {suggestedParent && !parentId && (
+                <div style={{ marginBottom: '16px', padding: '8px 10px', border: '1px solid var(--ink-faint)', fontSize: '0.78rem', color: 'var(--ink-light)' }}>
+                  检测到上属地点「{suggestedParent.name}」，是否设置？
+                  <div style={{ marginTop: '6px', display: 'flex', gap: '12px' }}>
+                    <button onClick={() => setParentId(suggestedParent.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-text)', fontSize: '0.78rem', fontFamily: 'var(--font-serif)', borderBottom: '1px solid var(--ink-text)', paddingBottom: '1px' }}>是</button>
+                    <button onClick={() => setSuggestedParent(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.78rem', fontFamily: 'var(--font-serif)' }}>否</button>
+                  </div>
+                </div>
+              )}
+              {/* Manual parent selector */}
+              <div style={{ marginBottom: '24px' }}>
+                <p style={{ color: 'var(--ink-faint)', fontSize: '0.72rem', marginBottom: '6px', letterSpacing: '0.05em' }}>上属地点（可选）</p>
+                <select
+                  value={parentId}
+                  onChange={(e) => { setParentId(e.target.value); setSuggestedParent(null); }}
+                  style={{ width: '100%', padding: '6px 0', background: 'transparent', border: 'none', borderBottom: '1px solid var(--ink-faint)', color: 'var(--ink-text)', fontSize: '0.875rem', fontFamily: 'var(--font-serif)', outline: 'none', cursor: 'pointer' }}
+                >
+                  <option value="">无</option>
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
               <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setPending(null)}

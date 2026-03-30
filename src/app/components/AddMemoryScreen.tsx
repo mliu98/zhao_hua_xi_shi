@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, X, Plus, Minus } from 'lucide-react';
-import { getLocations } from '../../lib/locationService';
+import { getLocations, updateLocationParent } from '../../lib/locationService';
 import { createPhotoMemory, createNoteMemory, createBookMemory } from '../../lib/memoryService';
 import { createBook } from '../../lib/bookService';
 import { searchBooks } from '../../lib/bookSearchService';
@@ -392,6 +392,31 @@ export function AddMemoryScreen() {
               {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </div>
+
+          {/* Parent location management (shown when a location is selected) */}
+          {locationId && (() => {
+            const selected = locations.find((l) => l.id === locationId);
+            if (!selected) return null;
+            return (
+              <div>
+                <label style={labelStyle}>「{selected.name}」的上属地点（可选）</label>
+                <select
+                  value={selected.parent_id ?? ''}
+                  onChange={async (e) => {
+                    const newParentId = e.target.value || null;
+                    await updateLocationParent(locationId, newParentId).catch(console.error);
+                    setLocations((prev) => prev.map((l) => l.id === locationId ? { ...l, parent_id: newParentId } : l));
+                  }}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                >
+                  <option value="">无</option>
+                  {locations.filter((l) => l.id !== locationId).map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
 
           {/* Date */}
           <div>

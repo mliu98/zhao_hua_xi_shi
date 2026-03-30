@@ -48,3 +48,9 @@ create table book_quotes (
 -- Storage: go to Supabase Dashboard → Storage → New bucket
 -- Name: memory-images
 -- Public bucket: true
+
+-- Migration: hierarchical locations
+-- Run in Supabase SQL Editor to add parent_id support:
+--
+-- ALTER TABLE locations
+--   ADD COLUMN parent_id uuid REFERENCES locations(id) ON DELETE SET NULL;

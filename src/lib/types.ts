@@ -3,6 +3,7 @@ export interface Location {
   name: string
   lat: number
   lng: number
+  parent_id: string | null
   created_at: string
 }
 
