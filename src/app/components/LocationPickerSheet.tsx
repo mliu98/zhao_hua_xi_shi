@@ -45,23 +45,27 @@ export function LocationPickerSheet({ open, onClose, onSelect, currentLocationId
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             style={{
               position: 'fixed', bottom: 0, left: 0, right: 0,
-              background: 'var(--paper-bg)',
-              borderTop: '1px solid var(--ink-faint)',
+              background: 'rgba(22,22,24,0.92)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              borderTop: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '20px 20px 0 0',
               zIndex: 201,
               maxHeight: '70vh',
               display: 'flex',
               flexDirection: 'column',
               fontFamily: 'var(--font-serif)',
+              boxShadow: '0 -8px 40px rgba(0,0,0,0.5)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 12px', borderBottom: '1px solid var(--ink-faint)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <span style={{ color: 'var(--ink-text)', fontSize: '0.9rem' }}>选择地点</span>
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', padding: 0 }}>
                 <X size={18} />
               </button>
             </div>
 
-            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--ink-faint)' }}>
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <input
                 type="text"
                 value={query}
@@ -89,8 +93,8 @@ export function LocationPickerSheet({ open, onClose, onSelect, currentLocationId
                     onClick={() => { onSelect(loc); onClose(); }}
                     style={{
                       display: 'block', width: '100%', padding: '14px 20px',
-                      background: loc.id === currentLocationId ? 'var(--paper-warm)' : 'transparent',
-                      border: 'none', borderBottom: '1px solid var(--ink-faint)',
+                      background: loc.id === currentLocationId ? 'rgba(255,200,100,0.1)' : 'transparent',
+                      border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)',
                       textAlign: 'left', cursor: 'pointer',
                       color: 'var(--ink-text)', fontSize: '0.875rem',
                       fontFamily: 'var(--font-serif)',

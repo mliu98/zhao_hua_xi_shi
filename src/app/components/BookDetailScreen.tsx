@@ -249,7 +249,7 @@ export function BookDetailScreen() {
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--paper-bg)', border: '1px solid var(--ink-faint)', boxShadow: '0 4px 12px var(--paper-shadow)', zIndex: 100, maxHeight: '240px', overflowY: 'auto' }}
+                    style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'rgba(28,28,30,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', borderRadius: '12px', zIndex: 100, maxHeight: '240px', overflowY: 'auto', overflow: 'hidden' }}
                   >
                     {bookResults.map((r, i) => (
                       <button
@@ -291,7 +291,7 @@ export function BookDetailScreen() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '80px', height: '110px', border: '1px dashed var(--ink-faint)', background: 'var(--paper-warm)' }} onClick={() => coverInputRef.current?.click()}>
+                <div className="glass-dropzone flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '80px', height: '110px' }} onClick={() => coverInputRef.current?.click()}>
                   <span style={{ color: 'var(--ink-faint)', fontSize: '0.7rem', textAlign: 'center', padding: '4px' }}>上传封面</span>
                 </div>
               )}
@@ -326,7 +326,7 @@ export function BookDetailScreen() {
             {error && <p style={{ color: 'var(--ink-light)', fontSize: '0.8rem' }}>{error}</p>}
 
             <div className="pt-4">
-              <button onClick={handleSave} disabled={saving} style={{ width: '100%', padding: '14px', background: 'var(--ink-text)', color: 'var(--paper-warm)', fontSize: '0.875rem', fontFamily: 'var(--font-serif)', border: 'none', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+              <button onClick={handleSave} disabled={saving} className="glass-action-btn">
                 {saving ? '保存中…' : '保存修改'}
               </button>
             </div>

@@ -79,7 +79,7 @@ function MemoryCard({ memory, index, showLocation, to }: { memory: Memory; index
 
         {/* Note: text */}
         {memory.type === 'note' && memory.note?.note_type === 'text' && (
-          <div style={{ padding: '16px', background: 'var(--paper-warm)', boxShadow: '0 2px 8px var(--paper-shadow)', border: '1px solid rgba(58,54,50,0.08)' }}>
+          <div style={{ padding: '16px', background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
             <p style={{ color: 'var(--ink-text)', fontSize: '0.82rem', lineHeight: 1.8, margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 8, WebkitBoxOrient: 'vertical' }}>
               {memory.note.content}
             </p>
@@ -88,7 +88,7 @@ function MemoryCard({ memory, index, showLocation, to }: { memory: Memory; index
 
         {/* Book */}
         {memory.type === 'book' && memory.book && (
-          <div style={{ background: 'var(--paper-warm)', boxShadow: '0 2px 8px var(--paper-shadow)', border: '1px solid rgba(58,54,50,0.08)' }}>
+          <div style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
             {memory.book.cover_url && (
               <img loading="lazy" src={memory.book.cover_url} alt="" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block', filter: 'contrast(0.92) saturate(0.85)' }} />
             )}
@@ -122,17 +122,13 @@ function MemoryCard({ memory, index, showLocation, to }: { memory: Memory; index
   );
 }
 
-const filterBtnStyle = (active: boolean): React.CSSProperties => ({
-  background: 'none',
-  border: 'none',
-  cursor: 'pointer',
-  fontFamily: 'var(--font-serif)',
-  fontSize: '0.78rem',
-  color: active ? 'var(--ink-text)' : 'var(--ink-faint)',
-  paddingBottom: '2px',
-  borderBottom: active ? '1px solid var(--ink-text)' : 'none',
-  transition: 'all 0.2s',
-});
+function FilterBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} className={`glass-chip${active ? ' active' : ''}`} style={{ fontSize: '0.75rem', padding: '3px 10px' }}>
+      {children}
+    </button>
+  );
+}
 
 export function LocationMemoryScreen() {
   const { id } = useParams();
@@ -263,21 +259,12 @@ export function LocationMemoryScreen() {
                 <Link
                   key={child.id}
                   to={`/location/${child.id}`}
-                  style={{
-                    padding: '5px 12px',
-                    border: '1px solid var(--ink-faint)',
-                    color: 'var(--ink-text)',
-                    fontSize: '0.8rem',
-                    textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                  className="hover:opacity-70 transition-opacity"
+                  className="glass-chip hover:opacity-80 transition-opacity"
+                  style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
                   {child.name}
                   {childMemoryCounts[child.id] > 0 && (
-                    <span style={{ color: 'var(--ink-faint)', fontSize: '0.7rem' }}>
+                    <span style={{ color: 'var(--ink-faint)', fontSize: '0.68rem' }}>
                       {childMemoryCounts[child.id]}
                     </span>
                   )}
@@ -291,28 +278,23 @@ export function LocationMemoryScreen() {
         {allItems.length > 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35, duration: 0.6 }} className="flex items-center gap-6 mb-6 flex-wrap">
             {/* Type filter */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
               {(['all', 'photo', 'note', 'book'] as const).map((t) => (
-                <button key={t} onClick={() => setTypeFilter(t)} style={filterBtnStyle(typeFilter === t)}>
+                <FilterBtn key={t} active={typeFilter === t} onClick={() => setTypeFilter(t)}>
                   {t === 'all' ? '全部' : t === 'photo' ? '照片' : t === 'note' ? '笔记' : '书籍'}
-                </button>
+                </FilterBtn>
               ))}
             </div>
 
             {/* Sub-location filter */}
             {children.length > 0 && (
-              <div className="flex items-center gap-4" style={{ borderLeft: '1px solid var(--ink-faint)', paddingLeft: '16px' }}>
-                <button onClick={() => setSubFilter('all')} style={filterBtnStyle(subFilter === 'all')}>所有下属</button>
-                <button
-                  onClick={() => setSubFilter(location.id)}
-                  style={filterBtnStyle(subFilter === location.id)}
-                >
-                  仅本地
-                </button>
+              <div className="flex items-center gap-2 flex-wrap" style={{ borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '16px' }}>
+                <FilterBtn active={subFilter === 'all'} onClick={() => setSubFilter('all')}>所有下属</FilterBtn>
+                <FilterBtn active={subFilter === location.id} onClick={() => setSubFilter(location.id)}>仅本地</FilterBtn>
                 {children.map((child) => (
-                  <button key={child.id} onClick={() => setSubFilter(child.id)} style={filterBtnStyle(subFilter === child.id)}>
+                  <FilterBtn key={child.id} active={subFilter === child.id} onClick={() => setSubFilter(child.id)}>
                     {child.name}
-                  </button>
+                  </FilterBtn>
                 ))}
               </div>
             )}

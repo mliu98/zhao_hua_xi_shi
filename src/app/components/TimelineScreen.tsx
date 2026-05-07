@@ -176,7 +176,7 @@ export function TimelineScreen() {
                       width: '100%',
                       background: 'transparent',
                       border: 'none',
-                      borderBottom: '1px solid var(--ink-faint)',
+                      borderBottom: '1px solid rgba(255,255,255,0.07)',
                       padding: '16px 0',
                       cursor: 'pointer',
                       textAlign: 'left',
@@ -209,14 +209,7 @@ export function TimelineScreen() {
                         >
                           {memory.date}
                         </span>
-                        <span
-                          style={{
-                            color: 'var(--ink-light)',
-                            fontSize: '0.72rem',
-                            padding: '1px 6px',
-                            border: '1px solid var(--ink-faint)',
-                          }}
-                        >
+                        <span className="glass-chip" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
                           {typeLabel(memory)}
                         </span>
                       </div>

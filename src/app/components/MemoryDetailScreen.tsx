@@ -116,7 +116,7 @@ function BookSpread({ urls }: { urls: string[] }) {
   if (isMobile) {
     return (
       <div>
-        <div style={{ position: 'relative', boxShadow: '0 4px 16px var(--paper-shadow)', border: '4px solid var(--paper-warm)' }}>
+        <div style={{ position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.5)', border: '3px solid rgba(255,255,255,0.08)' }}>
           <img src={leftUrl} alt="" className="w-full" style={{ display: 'block', filter: 'contrast(0.92) saturate(0.85)' }} />
           {urls.length > 1 && (
             <>
@@ -143,7 +143,7 @@ function BookSpread({ urls }: { urls: string[] }) {
   // Desktop: double-page spread
   return (
     <div>
-      <div style={{ boxShadow: '0 4px 24px var(--paper-shadow)', border: '4px solid var(--paper-warm)', display: 'grid', gridTemplateColumns: '1fr 6px 1fr', alignItems: 'stretch' }}>
+      <div style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.5)', border: '3px solid rgba(255,255,255,0.08)', display: 'grid', gridTemplateColumns: '1fr 6px 1fr', alignItems: 'stretch' }}>
         {/* Left page */}
         <img ref={leftRef} src={leftUrl} alt="" style={{ display: 'block', width: '100%', filter: 'contrast(0.92) saturate(0.85)' }} />
 
@@ -289,7 +289,7 @@ export function MemoryDetailScreen() {
 
           {/* Note: text */}
           {memory.type === 'note' && memory.note?.note_type === 'text' && (
-            <div style={{ padding: '40px', background: 'var(--paper-warm)', boxShadow: '0 4px 16px var(--paper-shadow)', border: '1px solid rgba(58,54,50,0.08)' }}>
+            <div style={{ padding: '40px', background: 'rgba(30,30,30,0.55)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.45)' }}>
               <p style={{ color: 'var(--ink-text)', fontSize: '1rem', lineHeight: '2', margin: 0, whiteSpace: 'pre-wrap' }}>
                 {memory.note.content}
               </p>
