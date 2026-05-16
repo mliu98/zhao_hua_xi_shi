@@ -10,9 +10,25 @@ import {
   getDescendantIds,
 } from '../../lib/locationService';
 import { getMemoriesByLocationTree } from '../../lib/memoryService';
-import type { Location, Memory } from '../../lib/types';
+import { getBooksByLocationIds } from '../../lib/bookService';
+import type { Location, Memory, Book } from '../../lib/types';
 
-function MemoryCard({ memory, index, showLocation }: { memory: Memory; index: number; showLocation?: boolean }) {
+type DisplayItem = Memory & { _to?: string }
+
+function bookToDisplayItem(book: Book): DisplayItem {
+  return {
+    id: `book-${book.id}`,
+    location_id: book.location_id!,
+    type: 'book',
+    date: book.read_date ?? book.created_at.slice(0, 10),
+    created_at: book.created_at,
+    book,
+    _to: `/book/${book.id}`,
+  }
+}
+
+function MemoryCard({ memory, index, showLocation, to }: { memory: Memory; index: number; showLocation?: boolean; to?: string }) {
+  const linkTo = to ?? `/memory/${memory.id}`;
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -20,7 +36,7 @@ function MemoryCard({ memory, index, showLocation }: { memory: Memory; index: nu
       transition={{ delay: 0.15 + index * 0.05, duration: 0.5 }}
       style={{ breakInside: 'avoid', marginBottom: '16px' }}
     >
-      <Link to={`/memory/${memory.id}`} style={{ textDecoration: 'none', display: 'block' }} className="hover:opacity-80 transition-opacity">
+      <Link to={linkTo} style={{ textDecoration: 'none', display: 'block' }} className="hover:opacity-80 transition-opacity">
 
         {/* Photo */}
         {memory.type === 'photo' && memory.photo && memory.photo.images.length > 0 && (
@@ -123,6 +139,7 @@ export function LocationMemoryScreen() {
   const [allLocations, setAllLocations] = useState<Location[]>([]);
   const [location, setLocation] = useState<Location | null>(null);
   const [allMemories, setAllMemories] = useState<Memory[]>([]);
+  const [locationBooks, setLocationBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<'all' | 'photo' | 'note' | 'book'>('all');
   const [subFilter, setSubFilter] = useState<string>('all'); // 'all' | locationId
@@ -139,8 +156,12 @@ export function LocationMemoryScreen() {
         if (loc) {
           const descendantIds = getDescendantIds(locs, loc.id);
           const allIds = [loc.id, ...descendantIds];
-          const memories = await getMemoriesByLocationTree(allIds);
+          const [memories, books] = await Promise.all([
+            getMemoriesByLocationTree(allIds),
+            getBooksByLocationIds(allIds),
+          ]);
           setAllMemories(memories);
+          setLocationBooks(books);
         }
       })
       .catch(console.error)
@@ -157,19 +178,24 @@ export function LocationMemoryScreen() {
     [allLocations, location]
   );
 
-  // Count all tree memories per child (for the chips)
+  const allItems = useMemo<DisplayItem[]>(() => {
+    const bookItems = locationBooks.map(bookToDisplayItem);
+    return [...allMemories, ...bookItems].sort((a, b) => b.date.localeCompare(a.date));
+  }, [allMemories, locationBooks]);
+
+  // Count all tree items per child (for the chips)
   const childMemoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const child of children) {
       const childDescendantIds = getDescendantIds(allLocations, child.id);
       const childIds = new Set([child.id, ...childDescendantIds]);
-      counts[child.id] = allMemories.filter((m) => childIds.has(m.location_id)).length;
+      counts[child.id] = allItems.filter((m) => childIds.has(m.location_id)).length;
     }
     return counts;
-  }, [children, allLocations, allMemories]);
+  }, [children, allLocations, allItems]);
 
   const filteredMemories = useMemo(() => {
-    let result = allMemories;
+    let result = allItems;
 
     // Sub-location filter
     if (subFilter !== 'all') {
@@ -184,7 +210,7 @@ export function LocationMemoryScreen() {
     }
 
     return result;
-  }, [allMemories, subFilter, typeFilter, allLocations]);
+  }, [allItems, subFilter, typeFilter, allLocations]);
 
   const showLocationBadge = subFilter === 'all' && children.length > 0;
 
@@ -262,7 +288,7 @@ export function LocationMemoryScreen() {
         )}
 
         {/* Filter bar */}
-        {allMemories.length > 0 && (
+        {allItems.length > 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35, duration: 0.6 }} className="flex items-center gap-6 mb-6 flex-wrap">
             {/* Type filter */}
             <div className="flex items-center gap-4">
@@ -301,7 +327,7 @@ export function LocationMemoryScreen() {
         ) : (
           <div style={{ columns: '3 160px', columnGap: '16px' }}>
             {filteredMemories.map((memory, index) => (
-              <MemoryCard key={memory.id} memory={memory} index={index} showLocation={showLocationBadge} />
+              <MemoryCard key={memory.id} memory={memory} index={index} showLocation={showLocationBadge} to={(memory as DisplayItem)._to} />
             ))}
           </div>
         )}
