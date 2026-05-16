@@ -128,11 +128,16 @@ Deno.serve(async (req) => {
       })
     }
 
-    const rssRes = await fetch(
-      `https://www.goodreads.com/review/list_rss/${goodreadsUserId}?shelf=read&sort=date_read&order=d`
-    )
+    const rssUrl = `https://www.goodreads.com/review/list_rss/${goodreadsUserId}?shelf=read&sort=date_read&order=d`
+    console.log('Fetching RSS:', rssUrl)
+    const rssRes = await fetch(rssUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ZhaoHuaXiShi/1.0)' }
+    })
+    console.log('RSS status:', rssRes.status)
     if (!rssRes.ok) {
-      return new Response(JSON.stringify({ error: 'Failed to fetch Goodreads RSS' }), {
+      const body = await rssRes.text()
+      console.error('RSS error body:', body.slice(0, 300))
+      return new Response(JSON.stringify({ error: `Goodreads RSS returned ${rssRes.status}`, detail: body.slice(0, 200) }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -162,39 +167,38 @@ Deno.serve(async (req) => {
 
     const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
 
-    const results: GoodreadsBook[] = await Promise.all(
-      newBooks.map(async (book) => {
-        const locationName = await detectLocation(book.description, anthropic)
-        let detectedLocation: DetectedLocation | null = null
+    const results: GoodreadsBook[] = []
+    for (const book of newBooks) {
+      const locationName = await detectLocation(book.description, anthropic)
+      let detectedLocation: DetectedLocation | null = null
 
-        if (locationName) {
-          const existingId = locationMap.get(locationName.toLowerCase())
-          if (existingId) {
-            detectedLocation = { name: locationName, lat: 0, lng: 0, isNew: false, existingId }
-          } else {
-            const coords = await geocode(locationName)
-            if (coords) detectedLocation = { name: locationName, ...coords, isNew: true }
-          }
+      if (locationName) {
+        const existingId = locationMap.get(locationName.toLowerCase())
+        if (existingId) {
+          detectedLocation = { name: locationName, lat: 0, lng: 0, isNew: false, existingId }
+        } else {
+          const coords = await geocode(locationName)
+          if (coords) detectedLocation = { name: locationName, ...coords, isNew: true }
         }
+      }
 
-        return {
-          goodreads_id: book.goodreads_id,
-          title: book.title,
-          author: book.author,
-          cover_url: book.cover_url,
-          date_read: book.date_read,
-          reading_notes: book.reading_notes,
-          detectedLocation,
-        }
+      results.push({
+        goodreads_id: book.goodreads_id,
+        title: book.title,
+        author: book.author,
+        cover_url: book.cover_url,
+        date_read: book.date_read,
+        reading_notes: book.reading_notes,
+        detectedLocation,
       })
-    )
+    }
 
     return new Response(JSON.stringify({ books: results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    console.error(err)
-    return new Response(JSON.stringify({ error: String(err) }), {
+    console.error('Unhandled error:', err)
+    return new Response(JSON.stringify({ error: String(err), stack: err instanceof Error ? err.stack : undefined }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

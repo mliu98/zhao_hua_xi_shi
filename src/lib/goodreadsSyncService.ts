@@ -40,7 +40,11 @@ export async function fetchGoodreadsPreview(goodreadsUserId: string): Promise<Sy
   const { data, error } = await supabase.functions.invoke('sync-goodreads', {
     body: { goodreadsUserId },
   })
-  if (error) throw error
+  if (error) {
+    // Extract the actual error message from the response body
+    const body = await (error as any).context?.json?.().catch(() => null)
+    throw new Error(body?.error ?? body?.detail ?? error.message)
+  }
   return (data as { books: SyncPreviewBook[] }).books
 }
 
