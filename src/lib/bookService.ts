@@ -150,6 +150,15 @@ function yearOf(dateStr: string): number {
   return parseInt(dateStr.slice(0, 4), 10)
 }
 
+export async function getExistingGoodreadsIds(): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('books')
+    .select('goodreads_id')
+    .not('goodreads_id', 'is', null)
+  if (error) throw error
+  return new Set((data as { goodreads_id: string }[]).map((r) => r.goodreads_id))
+}
+
 export async function updateBookLocation(bookId: string, locationId: string | null): Promise<void> {
   const { error } = await supabase.from('books').update({ location_id: locationId }).eq('id', bookId)
   if (error) throw error
