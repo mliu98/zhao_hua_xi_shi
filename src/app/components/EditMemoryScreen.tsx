@@ -37,7 +37,11 @@ export function EditMemoryScreen() {
   const [removePhotoIds, setRemovePhotoIds] = useState<string[]>([]);
   const [newPhotoFiles, setNewPhotoFiles] = useState<MediaItem[]>([]);
   const [newPhotoPreviews, setNewPhotoPreviews] = useState<string[]>([]);
+  const [newLiveVideoFiles, setNewLiveVideoFiles] = useState<(File | null)[]>([]);
+  const [existingLiveVideos, setExistingLiveVideos] = useState<{ imageId: string; file: File }[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const liveVideoInputRef = useRef<HTMLInputElement>(null);
+  const [pendingLiveTarget, setPendingLiveTarget] = useState<{ type: 'existing'; imageId: string } | { type: 'new'; index: number } | null>(null);
 
   // Note
   const [noteContent, setNoteContent] = useState('');
@@ -125,11 +129,32 @@ export function EditMemoryScreen() {
         const { thumbnailBlob, previewUrl } = await extractVideoThumbnail(file);
         setNewPhotoFiles((prev) => [...prev, { file, type: 'video', thumbnailBlob }]);
         setNewPhotoPreviews((prev) => [...prev, previewUrl]);
+        setNewLiveVideoFiles((prev) => [...prev, null]);
       } else {
         setNewPhotoFiles((prev) => [...prev, { file, type: 'image' }]);
         setNewPhotoPreviews((prev) => [...prev, URL.createObjectURL(file)]);
+        setNewLiveVideoFiles((prev) => [...prev, null]);
       }
     }
+  }
+
+  function handleLiveVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !pendingLiveTarget) return;
+    e.target.value = '';
+    if (pendingLiveTarget.type === 'existing') {
+      setExistingLiveVideos((prev) => {
+        const filtered = prev.filter((lv) => lv.imageId !== pendingLiveTarget.imageId);
+        return [...filtered, { imageId: pendingLiveTarget.imageId, file }];
+      });
+    } else {
+      setNewLiveVideoFiles((prev) => {
+        const next = [...prev];
+        next[pendingLiveTarget.index] = file;
+        return next;
+      });
+    }
+    setPendingLiveTarget(null);
   }
 
   function handleNoteFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -164,7 +189,7 @@ export function EditMemoryScreen() {
     setError('');
     try {
       if (memory.type === 'photo') {
-        await updatePhotoMemory(memory.id, date, caption || undefined, newPhotoFiles, removePhotoIds);
+        await updatePhotoMemory(memory.id, date, caption || undefined, newPhotoFiles, removePhotoIds, newLiveVideoFiles, existingLiveVideos);
       } else if (memory.type === 'note') {
         await updateNoteMemory(memory.id, date, noteContent || undefined, newNoteFiles, removeNoteIds);
       } else if (memory.type === 'book') {
@@ -219,9 +244,19 @@ export function EditMemoryScreen() {
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   {existingPhotoImages.map((img) => {
                     const removing = removePhotoIds.includes(img.id);
+                    const hasLive = !!img.live_video_url || existingLiveVideos.some((lv) => lv.imageId === img.id);
                     return (
                       <div key={img.id} className="relative" style={{ aspectRatio: '1', overflow: 'hidden', opacity: removing ? 0.35 : 1 }}>
                         <img src={img.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {img.media_type === 'image' && (
+                          <button
+                            type="button"
+                            onClick={() => { setPendingLiveTarget({ type: 'existing', imageId: img.id }); liveVideoInputRef.current?.click(); }}
+                            style={{ position: 'absolute', bottom: '4px', left: '50%', transform: 'translateX(-50%)', background: hasLive ? 'rgba(70,120,70,0.8)' : 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '6px', padding: '2px 6px', cursor: 'pointer', color: 'white', fontSize: '0.6rem', fontFamily: 'var(--font-serif)', whiteSpace: 'nowrap' }}
+                          >
+                            {hasLive ? '✓ 实况' : '+ 实况'}
+                          </button>
+                        )}
                         <button type="button" onClick={() => toggleRemovePhoto(img.id)} style={{ position: 'absolute', top: '4px', right: '4px', background: removing ? 'rgba(200,80,60,0.7)' : 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
                           <X size={12} color="white" />
                         </button>
@@ -230,6 +265,7 @@ export function EditMemoryScreen() {
                   })}
                 </div>
                 <input ref={photoInputRef} type="file" accept="image/*,video/*" multiple onChange={handlePhotoFileChange} className="hidden" />
+                <input ref={liveVideoInputRef} type="file" accept="video/*" className="hidden" onChange={handleLiveVideoChange} />
                 {newPhotoPreviews.length > 0 && (
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     {newPhotoPreviews.map((src, i) => (
@@ -242,7 +278,16 @@ export function EditMemoryScreen() {
                             </div>
                           </div>
                         )}
-                        <button type="button" onClick={() => { setNewPhotoFiles((p) => p.filter((_, j) => j !== i)); setNewPhotoPreviews((p) => p.filter((_, j) => j !== i)); }} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                        {newPhotoFiles[i]?.type === 'image' && (
+                          <button
+                            type="button"
+                            onClick={() => { setPendingLiveTarget({ type: 'new', index: i }); liveVideoInputRef.current?.click(); }}
+                            style={{ position: 'absolute', bottom: '4px', left: '50%', transform: 'translateX(-50%)', background: newLiveVideoFiles[i] ? 'rgba(70,120,70,0.8)' : 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '6px', padding: '2px 6px', cursor: 'pointer', color: 'white', fontSize: '0.6rem', fontFamily: 'var(--font-serif)', whiteSpace: 'nowrap' }}
+                          >
+                            {newLiveVideoFiles[i] ? '✓ 实况' : '+ 实况'}
+                          </button>
+                        )}
+                        <button type="button" onClick={() => { setNewPhotoFiles((p) => p.filter((_, j) => j !== i)); setNewPhotoPreviews((p) => p.filter((_, j) => j !== i)); setNewLiveVideoFiles((p) => p.filter((_, j) => j !== i)); }} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
                           <X size={12} color="white" />
                         </button>
                       </div>

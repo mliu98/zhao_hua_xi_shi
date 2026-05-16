@@ -5,7 +5,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getMemoryById, deleteMemory } from '../../lib/memoryService';
 import type { Memory, PhotoImage } from '../../lib/types';
 
-function ImageGallery({ items }: { items: Pick<PhotoImage, 'image_url' | 'video_url' | 'media_type'>[] }) {
+function ImageGallery({ items, liveMode }: { items: Pick<PhotoImage, 'image_url' | 'video_url' | 'live_video_url' | 'media_type'>[]; liveMode: boolean }) {
   const [index, setIndex] = useState(0);
   const [zoomed, setZoomed] = useState(false);
   const [playingVideo, setPlayingVideo] = useState(false);
@@ -14,6 +14,7 @@ function ImageGallery({ items }: { items: Pick<PhotoImage, 'image_url' | 'video_
 
   const current = items[index];
   const isVideo = current.media_type === 'video' && !!current.video_url;
+  const showLive = liveMode && !isVideo && !!current.live_video_url;
 
   function handleNext(e: React.MouseEvent) {
     e.stopPropagation();
@@ -34,12 +35,22 @@ function ImageGallery({ items }: { items: Pick<PhotoImage, 'image_url' | 'video_
           style={{
             transform: zoomed ? 'scale(1.5)' : 'scale(1)',
             transition: 'transform 0.4s ease',
-            cursor: isVideo ? 'default' : 'zoom-in',
+            cursor: isVideo || showLive ? 'default' : 'zoom-in',
             overflow: 'hidden',
           }}
-          onClick={() => { if (!isVideo) setZoomed((z) => !z); }}
+          onClick={() => { if (!isVideo && !showLive) setZoomed((z) => !z); }}
         >
-          {isVideo && playingVideo ? (
+          {showLive ? (
+            <video
+              src={current.live_video_url!}
+              className="w-full"
+              style={{ display: 'block' }}
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+          ) : isVideo && playingVideo ? (
             <video
               src={current.video_url!}
               className="w-full"
@@ -187,6 +198,15 @@ export function MemoryDetailScreen() {
   const [memory, setMemory] = useState<Memory | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [liveMode, setLiveMode] = useState(() => localStorage.getItem('live_mode') !== '0');
+
+  function toggleLiveMode() {
+    setLiveMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('live_mode', next ? '1' : '0');
+      return next;
+    });
+  }
 
   useEffect(() => {
     getMemoryById(id!).then(setMemory).catch(console.error).finally(() => setLoading(false));
@@ -223,6 +243,7 @@ export function MemoryDetailScreen() {
   }
 
   const isPhoto = memory.type === 'photo';
+  const hasLivePhotos = isPhoto && (memory.photo?.images ?? []).some((img) => !!img.live_video_url);
 
   return (
     <motion.div
@@ -243,6 +264,14 @@ export function MemoryDetailScreen() {
           {locationName}
         </Link>
         <div className="flex items-center gap-4">
+          {hasLivePhotos && (
+            <button
+              onClick={toggleLiveMode}
+              style={{ background: liveMode ? 'rgba(70,120,70,0.25)' : 'rgba(58,54,50,0.2)', border: `1px solid ${liveMode ? 'rgba(70,120,70,0.5)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', color: liveMode ? 'rgba(140,200,140,0.9)' : 'var(--ink-faint)', fontSize: '0.75rem', fontFamily: 'var(--font-serif)' }}
+            >
+              实况 {liveMode ? '开' : '关'}
+            </button>
+          )}
           <Link
             to={`/memory/${memory.id}/edit`}
             style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textDecoration: 'none' }}
@@ -272,7 +301,7 @@ export function MemoryDetailScreen() {
         >
           {/* Photo */}
           {memory.type === 'photo' && memory.photo && (
-            <ImageGallery items={memory.photo.images} />
+            <ImageGallery items={memory.photo.images} liveMode={liveMode} />
           )}
 
           {/* Note: handwritten */}

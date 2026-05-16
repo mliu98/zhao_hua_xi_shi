@@ -24,6 +24,7 @@ export interface PhotoImage {
   memory_id: string
   image_url: string   // thumbnail for videos, full image for photos
   video_url: string | null
+  live_video_url: string | null
   media_type: 'image' | 'video'
   order: number
 }
