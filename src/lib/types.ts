@@ -55,6 +55,7 @@ export interface Book {
   cover_url: string | null
   reading_notes: string | null
   read_date: string | null
+  goodreads_id: string | null
   created_at: string
   location_id: string | null
   location?: Location

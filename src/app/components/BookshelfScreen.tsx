@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getAllBooks, getAvailableYears, getBooksForYear } from '../../lib/bookService';
 import type { Book } from '../../lib/types';
+import { GoodreadsSyncSheet } from './GoodreadsSyncSheet';
 
 const SPINE_COLORS = [
   '#3d5a47', '#8b4a2b', '#2c3e5a', '#5c4033',
@@ -129,8 +130,9 @@ export function BookshelfScreen() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
+  const [showSync, setShowSync] = useState(false);
 
-  useEffect(() => {
+  function loadBooks() {
     getAllBooks().then((books) => {
       setAllBooks(books);
       const years = getAvailableYears(books);
@@ -140,12 +142,34 @@ export function BookshelfScreen() {
         setSelectedYear(years.includes(currentYear) ? currentYear : years[0]);
       }
     }).catch(console.error).finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { loadBooks(); }, []);
 
   const booksThisYear = getBooksForYear(allBooks, selectedYear);
 
   return (
     <div style={{ fontFamily: 'var(--font-serif)', minHeight: '60vh', paddingBottom: '4rem' }}>
+      {/* Sync button */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 24px 8px' }}>
+        <button
+          onClick={() => setShowSync(true)}
+          className="glass-chip"
+          style={{ fontSize: '0.75rem', padding: '5px 12px' }}
+        >
+          同步 Goodreads
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {showSync && (
+          <GoodreadsSyncSheet
+            onClose={() => setShowSync(false)}
+            onDone={() => { setShowSync(false); loadBooks(); }}
+          />
+        )}
+      </AnimatePresence>
+
       {loading ? (
         <div className="flex items-center justify-center" style={{ height: '40vh', color: 'var(--ink-faint)', fontSize: '0.875rem' }}>
           …
