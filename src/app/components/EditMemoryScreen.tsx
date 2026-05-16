@@ -3,8 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, X, Plus, Minus } from 'lucide-react';
 import { getMemoryById, updatePhotoMemory, updateNoteMemory, updateBookMemory } from '../../lib/memoryService';
+import type { MediaItem } from '../../lib/memoryService';
+import { getLocations, updateLocationParent } from '../../lib/locationService';
 // BookData re-exported from memoryService for backwards compat
-import type { Memory, PhotoImage, NoteImage } from '../../lib/types';
+import type { Memory, PhotoImage, NoteImage, Location } from '../../lib/types';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px 0', background: 'transparent', border: 'none',
@@ -21,6 +23,7 @@ export function EditMemoryScreen() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [memory, setMemory] = useState<Memory | null>(null);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -32,9 +35,13 @@ export function EditMemoryScreen() {
   const [caption, setCaption] = useState('');
   const [existingPhotoImages, setExistingPhotoImages] = useState<PhotoImage[]>([]);
   const [removePhotoIds, setRemovePhotoIds] = useState<string[]>([]);
-  const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
+  const [newPhotoFiles, setNewPhotoFiles] = useState<MediaItem[]>([]);
   const [newPhotoPreviews, setNewPhotoPreviews] = useState<string[]>([]);
+  const [newLiveVideoFiles, setNewLiveVideoFiles] = useState<(File | null)[]>([]);
+  const [existingLiveVideos, setExistingLiveVideos] = useState<{ imageId: string; file: File }[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const liveVideoInputRef = useRef<HTMLInputElement>(null);
+  const [pendingLiveTarget, setPendingLiveTarget] = useState<{ type: 'existing'; imageId: string } | { type: 'new'; index: number } | null>(null);
 
   // Note
   const [noteContent, setNoteContent] = useState('');
@@ -55,6 +62,7 @@ export function EditMemoryScreen() {
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    getLocations().then(setLocations).catch(console.error);
     getMemoryById(id!).then((m) => {
       if (!m) return;
       setMemory(m);
@@ -78,12 +86,75 @@ export function EditMemoryScreen() {
     }).catch(console.error).finally(() => setLoading(false));
   }, [id]);
 
-  function handlePhotoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function extractVideoThumbnail(file: File): Promise<{ thumbnailBlob: Blob; previewUrl: string }> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      const url = URL.createObjectURL(file);
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => {
+        video.currentTime = 0.1;
+      });
+      video.addEventListener('seeked', () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d')!.drawImage(video, 0, 0);
+        URL.revokeObjectURL(url);
+        canvas.toBlob((blob) => {
+          if (!blob) { reject(new Error('thumbnail failed')); return; }
+          resolve({ thumbnailBlob: blob, previewUrl: URL.createObjectURL(blob) });
+        }, 'image/jpeg', 0.8);
+      });
+      video.addEventListener('error', reject);
+      video.load();
+    });
+  }
+
+  async function handlePhotoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-    setNewPhotoFiles((prev) => [...prev, ...files]);
-    setNewPhotoPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))]);
     e.target.value = '';
+    const MAX_VIDEO = 50 * 1024 * 1024;
+    for (const file of files) {
+      if (file.type.startsWith('video/') && file.size > MAX_VIDEO) {
+        setError(`"${file.name}" 超过 50 MB 限制`);
+        return;
+      }
+    }
+    for (const file of files) {
+      if (file.type.startsWith('video/')) {
+        const { thumbnailBlob, previewUrl } = await extractVideoThumbnail(file);
+        setNewPhotoFiles((prev) => [...prev, { file, type: 'video', thumbnailBlob }]);
+        setNewPhotoPreviews((prev) => [...prev, previewUrl]);
+        setNewLiveVideoFiles((prev) => [...prev, null]);
+      } else {
+        setNewPhotoFiles((prev) => [...prev, { file, type: 'image' }]);
+        setNewPhotoPreviews((prev) => [...prev, URL.createObjectURL(file)]);
+        setNewLiveVideoFiles((prev) => [...prev, null]);
+      }
+    }
+  }
+
+  function handleLiveVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !pendingLiveTarget) return;
+    e.target.value = '';
+    if (pendingLiveTarget.type === 'existing') {
+      setExistingLiveVideos((prev) => {
+        const filtered = prev.filter((lv) => lv.imageId !== pendingLiveTarget.imageId);
+        return [...filtered, { imageId: pendingLiveTarget.imageId, file }];
+      });
+    } else {
+      setNewLiveVideoFiles((prev) => {
+        const next = [...prev];
+        next[pendingLiveTarget.index] = file;
+        return next;
+      });
+    }
+    setPendingLiveTarget(null);
   }
 
   function handleNoteFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -118,7 +189,7 @@ export function EditMemoryScreen() {
     setError('');
     try {
       if (memory.type === 'photo') {
-        await updatePhotoMemory(memory.id, date, caption || undefined, newPhotoFiles, removePhotoIds);
+        await updatePhotoMemory(memory.id, date, caption || undefined, newPhotoFiles, removePhotoIds, newLiveVideoFiles, existingLiveVideos);
       } else if (memory.type === 'note') {
         await updateNoteMemory(memory.id, date, noteContent || undefined, newNoteFiles, removeNoteIds);
       } else if (memory.type === 'book') {
@@ -173,9 +244,19 @@ export function EditMemoryScreen() {
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   {existingPhotoImages.map((img) => {
                     const removing = removePhotoIds.includes(img.id);
+                    const hasLive = !!img.live_video_url || existingLiveVideos.some((lv) => lv.imageId === img.id);
                     return (
                       <div key={img.id} className="relative" style={{ aspectRatio: '1', overflow: 'hidden', opacity: removing ? 0.35 : 1 }}>
                         <img src={img.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {img.media_type === 'image' && (
+                          <button
+                            type="button"
+                            onClick={() => { setPendingLiveTarget({ type: 'existing', imageId: img.id }); liveVideoInputRef.current?.click(); }}
+                            style={{ position: 'absolute', bottom: '4px', left: '50%', transform: 'translateX(-50%)', background: hasLive ? 'rgba(70,120,70,0.8)' : 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '6px', padding: '2px 6px', cursor: 'pointer', color: 'white', fontSize: '0.6rem', fontFamily: 'var(--font-serif)', whiteSpace: 'nowrap' }}
+                          >
+                            {hasLive ? '✓ 实况' : '+ 实况'}
+                          </button>
+                        )}
                         <button type="button" onClick={() => toggleRemovePhoto(img.id)} style={{ position: 'absolute', top: '4px', right: '4px', background: removing ? 'rgba(200,80,60,0.7)' : 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
                           <X size={12} color="white" />
                         </button>
@@ -183,21 +264,38 @@ export function EditMemoryScreen() {
                     );
                   })}
                 </div>
-                <input ref={photoInputRef} type="file" accept="image/*" multiple onChange={handlePhotoFileChange} className="hidden" />
+                <input ref={photoInputRef} type="file" accept="image/*,video/*" multiple onChange={handlePhotoFileChange} className="hidden" />
+                <input ref={liveVideoInputRef} type="file" accept="video/*" className="hidden" onChange={handleLiveVideoChange} />
                 {newPhotoPreviews.length > 0 && (
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     {newPhotoPreviews.map((src, i) => (
                       <div key={i} className="relative" style={{ aspectRatio: '1', overflow: 'hidden' }}>
                         <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'contrast(0.92) saturate(0.85)' }} />
-                        <button type="button" onClick={() => { setNewPhotoFiles((p) => p.filter((_, j) => j !== i)); setNewPhotoPreviews((p) => p.filter((_, j) => j !== i)); }} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                        {newPhotoFiles[i]?.type === 'video' && (
+                          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(58,54,50,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <svg width="10" height="12" viewBox="0 0 10 12" fill="white"><polygon points="0,0 10,6 0,12"/></svg>
+                            </div>
+                          </div>
+                        )}
+                        {newPhotoFiles[i]?.type === 'image' && (
+                          <button
+                            type="button"
+                            onClick={() => { setPendingLiveTarget({ type: 'new', index: i }); liveVideoInputRef.current?.click(); }}
+                            style={{ position: 'absolute', bottom: '4px', left: '50%', transform: 'translateX(-50%)', background: newLiveVideoFiles[i] ? 'rgba(70,120,70,0.8)' : 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '6px', padding: '2px 6px', cursor: 'pointer', color: 'white', fontSize: '0.6rem', fontFamily: 'var(--font-serif)', whiteSpace: 'nowrap' }}
+                          >
+                            {newLiveVideoFiles[i] ? '✓ 实况' : '+ 实况'}
+                          </button>
+                        )}
+                        <button type="button" onClick={() => { setNewPhotoFiles((p) => p.filter((_, j) => j !== i)); setNewPhotoPreviews((p) => p.filter((_, j) => j !== i)); setNewLiveVideoFiles((p) => p.filter((_, j) => j !== i)); }} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
                           <X size={12} color="white" />
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
-                <div className="flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ height: '48px', border: '1px dashed var(--ink-faint)', background: 'var(--paper-warm)' }} onClick={() => photoInputRef.current?.click()}>
-                  <span style={{ color: 'var(--ink-faint)', fontSize: '0.8rem' }}>+ 添加照片</span>
+                <div className="glass-dropzone flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ height: '48px' }} onClick={() => photoInputRef.current?.click()}>
+                  <span style={{ color: 'var(--ink-faint)', fontSize: '0.8rem' }}>+ 添加照片或视频</span>
                 </div>
               </div>
               <div>
@@ -238,7 +336,7 @@ export function EditMemoryScreen() {
                     ))}
                   </div>
                 )}
-                <div className="flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ height: '48px', border: '1px dashed var(--ink-faint)', background: 'var(--paper-warm)' }} onClick={() => noteInputRef.current?.click()}>
+                <div className="glass-dropzone flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ height: '48px' }} onClick={() => noteInputRef.current?.click()}>
                   <span style={{ color: 'var(--ink-faint)', fontSize: '0.8rem' }}>+ 添加图片</span>
                 </div>
               </div>
@@ -276,7 +374,7 @@ export function EditMemoryScreen() {
                     <button type="button" onClick={() => coverInputRef.current?.click()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '0.75rem', fontFamily: 'var(--font-serif)', paddingBottom: '4px' }}>更换</button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '80px', height: '110px', border: '1px dashed var(--ink-faint)', background: 'var(--paper-warm)' }} onClick={() => coverInputRef.current?.click()}>
+                  <div className="glass-dropzone flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '80px', height: '110px' }} onClick={() => coverInputRef.current?.click()}>
                     <span style={{ color: 'var(--ink-faint)', fontSize: '0.7rem', textAlign: 'center', padding: '4px' }}>上传封面</span>
                   </div>
                 )}
@@ -306,6 +404,31 @@ export function EditMemoryScreen() {
             </>
           )}
 
+          {/* Parent location management */}
+          {memory.location_id && (() => {
+            const selected = locations.find((l) => l.id === memory.location_id);
+            if (!selected) return null;
+            return (
+              <div>
+                <label style={labelStyle}>「{selected.name}」的上属地点（可选）</label>
+                <select
+                  value={selected.parent_id ?? ''}
+                  onChange={async (e) => {
+                    const newParentId = e.target.value || null;
+                    await updateLocationParent(memory.location_id, newParentId).catch(console.error);
+                    setLocations((prev) => prev.map((l) => l.id === memory.location_id ? { ...l, parent_id: newParentId } : l));
+                  }}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                >
+                  <option value="">无</option>
+                  {locations.filter((l) => l.id !== memory.location_id).map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
+
           {/* Date */}
           <div>
             <label style={labelStyle}>日期</label>
@@ -315,7 +438,7 @@ export function EditMemoryScreen() {
           {error && <p style={{ color: 'var(--ink-light)', fontSize: '0.8rem' }}>{error}</p>}
 
           <div className="pt-4">
-            <button type="submit" disabled={saving} style={{ width: '100%', padding: '14px', background: 'var(--ink-text)', color: 'var(--paper-warm)', fontSize: '0.875rem', fontFamily: 'var(--font-serif)', border: 'none', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+            <button type="submit" disabled={saving} className="glass-action-btn">
               {saving ? '保存中…' : '保存修改'}
             </button>
           </div>

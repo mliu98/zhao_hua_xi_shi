@@ -33,11 +33,23 @@ function normalizeMemory(raw: any) {
 const MEMORY_SELECT = `
   *,
   photo:memory_photos(*),
-  photo_images(order, image_url, id),
+  photo_images(order, image_url, video_url, live_video_url, media_type, id),
   note:memory_notes(*),
   note_images(order, image_url, id),
   book_link:memory_books(book:books(*, quotes:book_quotes(*)))
 `
+
+export async function getMemoriesByLocationTree(locationIds: string[]): Promise<Memory[]> {
+  if (locationIds.length === 0) return []
+  const { data, error } = await supabase
+    .from('memories')
+    .select(`${MEMORY_SELECT}, location:locations(name)`)
+    .in('location_id', locationIds)
+    .order('date', { ascending: false })
+
+  if (error) throw error
+  return (data as any[]).map(normalizeMemory) as Memory[]
+}
 
 export async function getMemoriesByLocation(locationId: string): Promise<Memory[]> {
   const { data, error } = await supabase
@@ -71,11 +83,19 @@ export async function getMemoryById(id: string): Promise<Memory | null> {
   return normalizeMemory(data) as Memory
 }
 
+export interface MediaItem {
+  file: File
+  type: 'image' | 'video'
+  thumbnailBlob?: Blob  // pre-extracted first frame for videos
+}
+
 export async function createPhotoMemory(
   locationId: string,
   date: string,
-  imageFiles: File[],
-  caption?: string
+  mediaItems: MediaItem[],
+  liveVideoFiles: (File | null)[],
+  caption?: string,
+  onProgress?: (uploaded: number, total: number) => void
 ): Promise<Memory> {
   const { data: memory, error: memError } = await supabase
     .from('memories')
@@ -91,13 +111,28 @@ export async function createPhotoMemory(
 
   if (photoError) throw photoError
 
-  const uploadedImages = await Promise.all(
-    imageFiles.map(async (file, i) => {
-      const path = `photos/${memory.id}-${i}-${file.name.replace(/\s+/g, '_')}`
-      const imageUrl = await uploadImage(file, path)
-      return { memory_id: memory.id, image_url: imageUrl, order: i }
-    })
-  )
+  const uploadedImages: { memory_id: string; image_url: string; video_url: string | null; live_video_url: string | null; media_type: string; order: number }[] = []
+  for (let i = 0; i < mediaItems.length; i++) {
+    const { file, type, thumbnailBlob } = mediaItems[i]
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+
+    if (type === 'video') {
+      const thumbFile = new File([thumbnailBlob!], `${safeName}.thumb.jpg`, { type: 'image/jpeg' })
+      const thumbUrl = await uploadImage(thumbFile, `photos/${memory.id}-${i}-${safeName}.thumb.jpg`)
+      const videoUrl = await uploadImage(file, `videos/${memory.id}-${i}-${safeName}`)
+      uploadedImages.push({ memory_id: memory.id, image_url: thumbUrl, video_url: videoUrl, live_video_url: null, media_type: 'video', order: i })
+    } else {
+      const imageUrl = await uploadImage(file, `photos/${memory.id}-${i}-${safeName}`)
+      let liveVideoUrl: string | null = null
+      const liveFile = liveVideoFiles[i] ?? null
+      if (liveFile) {
+        const safeLiveName = liveFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        liveVideoUrl = await uploadImage(liveFile, `live-photos/${memory.id}-${i}-${safeLiveName}`)
+      }
+      uploadedImages.push({ memory_id: memory.id, image_url: imageUrl, video_url: null, live_video_url: liveVideoUrl, media_type: 'image', order: i })
+    }
+    onProgress?.(i + 1, mediaItems.length)
+  }
 
   const { error: imgError } = await supabase.from('photo_images').insert(uploadedImages)
   if (imgError) throw imgError
@@ -174,8 +209,10 @@ export async function updatePhotoMemory(
   memoryId: string,
   date: string,
   caption: string | undefined,
-  newImageFiles: File[],
-  removeImageIds: string[]
+  newImageFiles: MediaItem[],
+  removeImageIds: string[],
+  liveVideoFiles?: (File | null)[],
+  existingLiveVideos?: { imageId: string; file: File }[]
 ): Promise<void> {
   const { error: memError } = await supabase.from('memories').update({ date }).eq('id', memoryId)
   if (memError) throw memError
@@ -191,15 +228,39 @@ export async function updatePhotoMemory(
   if (newImageFiles.length > 0) {
     const { data: existing } = await supabase.from('photo_images').select('order').eq('memory_id', memoryId).order('order', { ascending: false }).limit(1)
     const nextOrder = existing?.[0] ? (existing[0] as any).order + 1 : 0
-    const uploaded = await Promise.all(
-      newImageFiles.map(async (file, i) => {
-        const path = `photos/${memoryId}-${Date.now()}-${i}-${file.name.replace(/\s+/g, '_')}`
-        const imageUrl = await uploadImage(file, path)
-        return { memory_id: memoryId, image_url: imageUrl, order: nextOrder + i }
-      })
-    )
+    const uploaded: { memory_id: string; image_url: string; video_url: string | null; live_video_url: string | null; media_type: string; order: number }[] = []
+    const ts = Date.now()
+    for (let i = 0; i < newImageFiles.length; i++) {
+      const { file, type, thumbnailBlob } = newImageFiles[i]
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      if (type === 'video') {
+        const thumbFile = new File([thumbnailBlob!], `${safeName}.thumb.jpg`, { type: 'image/jpeg' })
+        const thumbUrl = await uploadImage(thumbFile, `photos/${memoryId}-${ts}-${i}-${safeName}.thumb.jpg`)
+        const videoUrl = await uploadImage(file, `videos/${memoryId}-${ts}-${i}-${safeName}`)
+        uploaded.push({ memory_id: memoryId, image_url: thumbUrl, video_url: videoUrl, live_video_url: null, media_type: 'video', order: nextOrder + i })
+      } else {
+        const imageUrl = await uploadImage(file, `photos/${memoryId}-${ts}-${i}-${safeName}`)
+        let liveVideoUrl: string | null = null
+        const liveFile = liveVideoFiles?.[i] ?? null
+        if (liveFile) {
+          const safeLiveName = liveFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+          liveVideoUrl = await uploadImage(liveFile, `live-photos/${memoryId}-${ts}-${i}-${safeLiveName}`)
+        }
+        uploaded.push({ memory_id: memoryId, image_url: imageUrl, video_url: null, live_video_url: liveVideoUrl, media_type: 'image', order: nextOrder + i })
+      }
+    }
     const { error } = await supabase.from('photo_images').insert(uploaded)
     if (error) throw error
+  }
+
+  if (existingLiveVideos && existingLiveVideos.length > 0) {
+    const ts = Date.now()
+    for (const { imageId, file } of existingLiveVideos) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const liveVideoUrl = await uploadImage(file, `live-photos/${memoryId}-${ts}-${safeName}`)
+      const { error } = await supabase.from('photo_images').update({ live_video_url: liveVideoUrl }).eq('id', imageId)
+      if (error) throw error
+    }
   }
 }
 
@@ -234,6 +295,16 @@ export async function updateNoteMemory(
     const { error } = await supabase.from('note_images').insert(uploaded)
     if (error) throw error
   }
+}
+
+export async function deleteMemory(memoryId: string): Promise<void> {
+  await supabase.from('photo_images').delete().eq('memory_id', memoryId)
+  await supabase.from('memory_photos').delete().eq('memory_id', memoryId)
+  await supabase.from('note_images').delete().eq('memory_id', memoryId)
+  await supabase.from('memory_notes').delete().eq('memory_id', memoryId)
+  await supabase.from('memory_books').delete().eq('memory_id', memoryId)
+  const { error } = await supabase.from('memories').delete().eq('id', memoryId)
+  if (error) throw error
 }
 
 export async function updateBookMemory(

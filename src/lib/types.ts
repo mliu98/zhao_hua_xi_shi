@@ -3,6 +3,7 @@ export interface Location {
   name: string
   lat: number
   lng: number
+  parent_id: string | null
   created_at: string
 }
 
@@ -21,7 +22,10 @@ export interface Memory {
 export interface PhotoImage {
   id: string
   memory_id: string
-  image_url: string
+  image_url: string   // thumbnail for videos, full image for photos
+  video_url: string | null
+  live_video_url: string | null
+  media_type: 'image' | 'video'
   order: number
 }
 
@@ -53,6 +57,8 @@ export interface Book {
   reading_notes: string | null
   read_date: string | null
   created_at: string
+  location_id: string | null
+  location?: Location
   quotes: BookQuote[]
   memoryDates?: string[] // linked memory dates, used for year filtering
 }

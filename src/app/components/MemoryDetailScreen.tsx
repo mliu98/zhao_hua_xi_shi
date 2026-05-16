@@ -1,64 +1,191 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getMemoryById } from '../../lib/memoryService';
-import type { Memory } from '../../lib/types';
+import { getMemoryById, deleteMemory } from '../../lib/memoryService';
+import type { Memory, PhotoImage } from '../../lib/types';
 
-function ImageGallery({ urls, border }: { urls: string[]; border?: string }) {
+function ImageGallery({ items, liveMode }: { items: Pick<PhotoImage, 'image_url' | 'video_url' | 'live_video_url' | 'media_type'>[]; liveMode: boolean }) {
   const [index, setIndex] = useState(0);
   const [zoomed, setZoomed] = useState(false);
+  const [playingVideo, setPlayingVideo] = useState(false);
 
-  if (urls.length === 0) return null;
+  if (items.length === 0) return null;
+
+  const current = items[index];
+  const isVideo = current.media_type === 'video' && !!current.video_url;
+  const showLive = liveMode && !isVideo && !!current.live_video_url;
+
+  function handleNext(e: React.MouseEvent) {
+    e.stopPropagation();
+    setPlayingVideo(false);
+    setIndex((i) => (i + 1) % items.length);
+  }
+
+  function handlePrev(e: React.MouseEvent) {
+    e.stopPropagation();
+    setPlayingVideo(false);
+    setIndex((i) => (i - 1 + items.length) % items.length);
+  }
 
   return (
     <div>
       <div style={{ position: 'relative' }}>
         <div
-          className="overflow-hidden cursor-zoom-in"
           style={{
-            boxShadow: '0 4px 16px var(--paper-shadow)',
-            border: border ?? 'none',
             transform: zoomed ? 'scale(1.5)' : 'scale(1)',
             transition: 'transform 0.4s ease',
+            cursor: isVideo || showLive ? 'default' : 'zoom-in',
+            overflow: 'hidden',
           }}
-          onClick={() => setZoomed(!zoomed)}
+          onClick={() => { if (!isVideo && !showLive) setZoomed((z) => !z); }}
         >
-          <img
-            src={urls[index]}
-            alt=""
-            className="w-full"
-            style={{ display: 'block', filter: 'contrast(0.92) saturate(0.85)' }}
-          />
+          {showLive ? (
+            <video
+              src={current.live_video_url!}
+              className="w-full"
+              style={{ display: 'block' }}
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+          ) : isVideo && playingVideo ? (
+            <video
+              src={current.video_url!}
+              className="w-full"
+              style={{ display: 'block' }}
+              controls
+              autoPlay
+            />
+          ) : (
+            <div style={{ position: 'relative' }}>
+              <img
+                src={current.image_url}
+                alt=""
+                className="w-full"
+                style={{ display: 'block', filter: 'contrast(0.92) saturate(0.85)' }}
+              />
+              {isVideo && !playingVideo && (
+                <div
+                  style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); setPlayingVideo(true); }}
+                >
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(58,54,50,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="20" height="24" viewBox="0 0 10 12" fill="white"><polygon points="0,0 10,6 0,12"/></svg>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {urls.length > 1 && !zoomed && (
+        {items.length > 1 && !zoomed && (
           <>
-            <button
-              onClick={(e) => { e.stopPropagation(); setIndex((i) => (i - 1 + urls.length) % urls.length); }}
-              style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
-            >
+            <button onClick={handlePrev} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
               <ChevronLeft size={16} color="white" />
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setIndex((i) => (i + 1) % urls.length); }}
-              style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
-            >
+            <button onClick={handleNext} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
               <ChevronRight size={16} color="white" />
             </button>
           </>
         )}
       </div>
 
-      {urls.length > 1 && (
+      {items.length > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '10px' }}>
-          {urls.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setIndex(i)}
-              style={{ width: '6px', height: '6px', borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: i === index ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: i === index ? 1 : 0.4 }}
-            />
+          {items.map((_, i) => (
+            <button key={i} onClick={() => { setIndex(i); setPlayingVideo(false); }} style={{ width: '6px', height: '6px', borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: i === index ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: i === index ? 1 : 0.4 }} />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BookSpread({ urls }: { urls: string[] }) {
+  const [spreadIndex, setSpreadIndex] = useState(0); // index of left-page image
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640);
+  const leftRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  if (urls.length === 0) return null;
+
+  const totalSpreads = Math.ceil(urls.length / 2);
+  const canPrev = spreadIndex > 0;
+  const canNext = spreadIndex + 2 < urls.length || (urls.length % 2 === 1 && spreadIndex + 1 < urls.length);
+
+  const leftUrl = urls[spreadIndex] ?? null;
+  const rightUrl = urls[spreadIndex + 1] ?? null;
+
+  // Mobile: single image fallback
+  if (isMobile) {
+    return (
+      <div>
+        <div style={{ position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.5)', border: '3px solid rgba(255,255,255,0.08)' }}>
+          <img src={leftUrl} alt="" className="w-full" style={{ display: 'block', filter: 'contrast(0.92) saturate(0.85)' }} />
+          {urls.length > 1 && (
+            <>
+              <button onClick={() => setSpreadIndex((i) => Math.max(0, i - 1))} disabled={!canPrev} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: canPrev ? 1 : 0.3 }}>
+                <ChevronLeft size={16} color="white" />
+              </button>
+              <button onClick={() => setSpreadIndex((i) => Math.min(urls.length - 1, i + 1))} disabled={!canNext} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: canNext ? 1 : 0.3 }}>
+                <ChevronRight size={16} color="white" />
+              </button>
+            </>
+          )}
+        </div>
+        {urls.length > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '10px' }}>
+            {urls.map((_, i) => (
+              <button key={i} onClick={() => setSpreadIndex(i)} style={{ width: '6px', height: '6px', borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: i === spreadIndex ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: i === spreadIndex ? 1 : 0.4 }} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop: double-page spread
+  return (
+    <div>
+      <div style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.5)', border: '3px solid rgba(255,255,255,0.08)', display: 'grid', gridTemplateColumns: '1fr 6px 1fr', alignItems: 'stretch' }}>
+        {/* Left page */}
+        <img ref={leftRef} src={leftUrl} alt="" style={{ display: 'block', width: '100%', filter: 'contrast(0.92) saturate(0.85)' }} />
+
+        {/* Spine */}
+        <div style={{
+          background: 'linear-gradient(to right, rgba(58,54,50,0.18), rgba(58,54,50,0.06) 40%, rgba(58,54,50,0.06) 60%, rgba(58,54,50,0.18))',
+          boxShadow: 'inset -1px 0 3px rgba(58,54,50,0.12), inset 1px 0 3px rgba(58,54,50,0.12)',
+        }} />
+
+        {/* Right page — blank if no image */}
+        {rightUrl ? (
+          <img src={rightUrl} alt="" style={{ display: 'block', width: '100%', filter: 'contrast(0.92) saturate(0.85)' }} />
+        ) : (
+          <div style={{ background: 'var(--paper-warm)', minHeight: leftRef.current?.offsetHeight ?? 200 }} />
+        )}
+      </div>
+
+      {/* Navigation */}
+      {totalSpreads > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', marginTop: '14px' }}>
+          <button onClick={() => setSpreadIndex((i) => Math.max(0, i - 2))} disabled={!canPrev} style={{ background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: canPrev ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: canPrev ? 1 : 0.3 }}>
+            <ChevronLeft size={16} color="white" />
+          </button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {Array.from({ length: totalSpreads }).map((_, i) => (
+              <button key={i} onClick={() => setSpreadIndex(i * 2)} style={{ width: '6px', height: '6px', borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: Math.floor(spreadIndex / 2) === i ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: Math.floor(spreadIndex / 2) === i ? 1 : 0.4 }} />
+            ))}
+          </div>
+          <button onClick={() => setSpreadIndex((i) => Math.min(urls.length % 2 === 0 ? urls.length - 2 : urls.length - 1, i + 2))} disabled={!canNext} style={{ background: 'rgba(58,54,50,0.45)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: canNext ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, opacity: canNext ? 1 : 0.3 }}>
+            <ChevronRight size={16} color="white" />
+          </button>
         </div>
       )}
     </div>
@@ -67,8 +194,19 @@ function ImageGallery({ urls, border }: { urls: string[]; border?: string }) {
 
 export function MemoryDetailScreen() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [memory, setMemory] = useState<Memory | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [liveMode, setLiveMode] = useState(() => localStorage.getItem('live_mode') !== '0');
+
+  function toggleLiveMode() {
+    setLiveMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('live_mode', next ? '1' : '0');
+      return next;
+    });
+  }
 
   useEffect(() => {
     getMemoryById(id!).then(setMemory).catch(console.error).finally(() => setLoading(false));
@@ -92,16 +230,31 @@ export function MemoryDetailScreen() {
 
   const locationName = (memory as any).location?.name ?? '';
 
+  async function handleDelete() {
+    if (!confirm('确定要删除这条记忆吗？')) return;
+    setDeleting(true);
+    try {
+      await deleteMemory(memory!.id);
+      navigate(memory!.location_id ? `/location/${memory!.location_id}` : '/');
+    } catch (err) {
+      console.error(err);
+      setDeleting(false);
+    }
+  }
+
+  const isPhoto = memory.type === 'photo';
+  const hasLivePhotos = isPhoto && (memory.photo?.images ?? []).some((img) => !!img.live_video_url);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.8 }}
-      className="min-h-screen p-6 flex flex-col"
+      className="min-h-screen flex flex-col"
       style={{ fontFamily: 'var(--font-serif)' }}
     >
       {/* Header */}
-      <div className="max-w-3xl mx-auto w-full mb-8 flex items-center justify-between">
+      <div className="max-w-3xl mx-auto w-full flex items-center justify-between" style={{ padding: '24px 24px 0' }}>
         <Link
           to={`/location/${memory.location_id}`}
           style={{ color: 'var(--ink-light)', fontSize: '0.875rem' }}
@@ -110,32 +263,51 @@ export function MemoryDetailScreen() {
           <ArrowLeft size={16} />
           {locationName}
         </Link>
-        <Link
-          to={`/memory/${memory.id}/edit`}
-          style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textDecoration: 'none' }}
-          className="hover:opacity-70 transition-opacity"
-        >
-          编辑
-        </Link>
+        <div className="flex items-center gap-4">
+          {hasLivePhotos && (
+            <button
+              onClick={toggleLiveMode}
+              style={{ background: liveMode ? 'rgba(70,120,70,0.25)' : 'rgba(58,54,50,0.2)', border: `1px solid ${liveMode ? 'rgba(70,120,70,0.5)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', color: liveMode ? 'rgba(140,200,140,0.9)' : 'var(--ink-faint)', fontSize: '0.75rem', fontFamily: 'var(--font-serif)' }}
+            >
+              实况 {liveMode ? '开' : '关'}
+            </button>
+          )}
+          <Link
+            to={`/memory/${memory.id}/edit`}
+            style={{ color: 'var(--ink-faint)', fontSize: '0.8rem', textDecoration: 'none' }}
+            className="hover:opacity-70 transition-opacity"
+          >
+            编辑
+          </Link>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            style={{ background: 'none', border: 'none', cursor: deleting ? 'default' : 'pointer', color: 'var(--ink-faint)', fontSize: '0.8rem', fontFamily: 'var(--font-serif)', opacity: deleting ? 0.5 : 1, padding: 0 }}
+            className="hover:opacity-70 transition-opacity"
+          >
+            {deleting ? '删除中…' : '删除'}
+          </button>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center" style={{ padding: '24px 12px' }}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.8 }}
-          className="max-w-xl w-full"
+          className="w-full"
+          style={{ maxWidth: memory.type === 'note' && memory.note?.note_type === 'handwritten' ? '900px' : isPhoto ? '800px' : '576px' }}
         >
           {/* Photo */}
           {memory.type === 'photo' && memory.photo && (
-            <ImageGallery urls={memory.photo.images.map((i) => i.image_url)} />
+            <ImageGallery items={memory.photo.images} liveMode={liveMode} />
           )}
 
           {/* Note: handwritten */}
           {memory.type === 'note' && memory.note?.note_type === 'handwritten' && memory.note.images.length > 0 && (
             <div>
-              <ImageGallery urls={memory.note.images.map((i) => i.image_url)} border="4px solid var(--paper-warm)" />
+              <BookSpread urls={memory.note.images.map((i) => i.image_url)} />
               {memory.note.content && (
                 <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', marginTop: '16px', textAlign: 'center', fontStyle: 'italic' }}>
                   {memory.note.content}
@@ -146,7 +318,7 @@ export function MemoryDetailScreen() {
 
           {/* Note: text */}
           {memory.type === 'note' && memory.note?.note_type === 'text' && (
-            <div style={{ padding: '40px', background: 'var(--paper-warm)', boxShadow: '0 4px 16px var(--paper-shadow)', border: '1px solid rgba(58,54,50,0.08)' }}>
+            <div style={{ padding: '40px', background: 'rgba(30,30,30,0.55)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.45)' }}>
               <p style={{ color: 'var(--ink-text)', fontSize: '1rem', lineHeight: '2', margin: 0, whiteSpace: 'pre-wrap' }}>
                 {memory.note.content}
               </p>
@@ -187,7 +359,8 @@ export function MemoryDetailScreen() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6, duration: 0.8 }}
-        className="max-w-3xl mx-auto w-full mt-8 text-center"
+        className="max-w-3xl mx-auto w-full text-center"
+        style={{ padding: '0 12px 32px' }}
       >
         {memory.type === 'photo' && memory.photo?.caption && (
           <p style={{ color: 'var(--ink-text)', fontSize: '0.9rem', marginBottom: '8px' }}>{memory.photo.caption}</p>

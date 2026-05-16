@@ -1,24 +1,163 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
-@import 'leaflet/dist/leaflet.css';
 
-/* Paper texture overlay */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  opacity: 0.015;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  z-index: 9999;
+/* ── Background ──────────────────────────────────────────── */
+html {
+  background: url('../assets/background.jpg') center / cover fixed no-repeat;
+  min-height: 100vh;
 }
 
 body {
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   font-family: var(--font-serif);
   line-height: 1.85;
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
 }
+
+/* ── Glass utilities ─────────────────────────────────────── */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45),
+              inset 0 1px 0 var(--glass-highlight);
+  border-radius: 16px;
+}
+
+/* Glass pill nav container */
+.glass-pill {
+  background: rgba(30, 30, 30, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4),
+              inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 6px;
+  display: inline-flex;
+  gap: 2px;
+}
+
+/* Individual tab inside pill */
+.glass-tab {
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 18px;
+  font-family: var(--font-serif);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.glass-tab:hover { color: var(--ink-text); }
+.glass-tab.active {
+  background: var(--accent-gold-bg);
+  border: 1px solid var(--accent-gold-border);
+  color: var(--accent-gold);
+  box-shadow: 0 2px 8px rgba(255, 200, 100, 0.2);
+}
+
+/* Filter chip (smaller pill buttons) */
+.glass-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-family: var(--font-serif);
+  font-size: 0.78rem;
+  color: var(--ink-light);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.glass-chip:hover { background: rgba(255, 255, 255, 0.1); color: var(--ink-text); }
+.glass-chip.active {
+  background: var(--accent-gold-bg);
+  border-color: var(--accent-gold-border);
+  color: var(--accent-gold);
+}
+
+/* Primary action button */
+.glass-action-btn {
+  background: rgba(255, 200, 100, 0.88);
+  color: #1a1200;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  width: 100%;
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(255, 200, 100, 0.3);
+  transition: opacity 0.2s, transform 0.1s;
+}
+.glass-action-btn:hover { opacity: 0.9; }
+.glass-action-btn:active { transform: scale(0.99); }
+.glass-action-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Glass input field */
+.glass-field {
+  width: 100%;
+  padding: 10px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--ink-text);
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.glass-field:focus { border-bottom-color: rgba(255, 200, 100, 0.5); }
+.glass-field::placeholder { color: var(--ink-faint); }
+
+/* Glass textarea / select variant */
+.glass-field-box {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: var(--ink-text);
+  font-family: var(--font-serif);
+  font-size: 0.875rem;
+  outline: none;
+  resize: vertical;
+  line-height: 1.8;
+  transition: border-color 0.2s;
+}
+.glass-field-box:focus { border-color: rgba(255, 200, 100, 0.4); }
+.glass-field-box::placeholder { color: var(--ink-faint); }
+
+/* Upload drop zone */
+.glass-dropzone {
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.glass-dropzone:hover { background: rgba(255, 255, 255, 0.07); }
+
+/* ── Mapbox popup ────────────────────────────────────────── */
+.ink-popup .mapboxgl-popup-content {
+  background: rgba(28, 28, 30, 0.82) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+}
+.ink-popup .mapboxgl-popup-tip { display: none !important; }

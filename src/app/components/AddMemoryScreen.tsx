@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, X, Plus, Minus } from 'lucide-react';
-import { getLocations } from '../../lib/locationService';
+import { getLocations, updateLocationParent } from '../../lib/locationService';
 import { createPhotoMemory, createNoteMemory, createBookMemory } from '../../lib/memoryService';
+import type { MediaItem } from '../../lib/memoryService';
 import { createBook } from '../../lib/bookService';
 import { searchBooks } from '../../lib/bookSearchService';
 import type { BookSearchResult } from '../../lib/bookSearchService';
@@ -36,11 +37,14 @@ export function AddMemoryScreen() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
 
   // photo / note
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]); // preview URLs (thumbnail for video)
+  const [liveVideoFiles, setLiveVideoFiles] = useState<(File | null)[]>([]);
   const [caption, setCaption] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const liveVideoInputRef = useRef<HTMLInputElement>(null);
+  const [pendingLiveIdx, setPendingLiveIdx] = useState<number | null>(null);
 
   // book
   const [bookQuery, setBookQuery] = useState('');
@@ -58,6 +62,7 @@ export function AddMemoryScreen() {
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ uploaded: number; total: number } | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -65,8 +70,9 @@ export function AddMemoryScreen() {
   }, []);
 
   useEffect(() => {
-    setImageFiles([]);
+    setMediaItems([]);
     setImagePreviews([]);
+    setLiveVideoFiles([]);
     setCaption('');
     setNoteContent('');
     setBookQuery('');
@@ -82,17 +88,74 @@ export function AddMemoryScreen() {
     setError('');
   }, [type, noteSubtype]);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-    setImageFiles((prev) => [...prev, ...files]);
-    setImagePreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))]);
     e.target.value = '';
+    const MAX_VIDEO = 50 * 1024 * 1024;
+    for (const file of files) {
+      if (file.type.startsWith('video/') && file.size > MAX_VIDEO) {
+        setError(`"${file.name}" 超过 50 MB 限制，请剪短后重新上传`);
+        return;
+      }
+    }
+    for (const file of files) {
+      if (file.type.startsWith('video/')) {
+        const { thumbnailBlob, previewUrl } = await extractVideoThumbnail(file);
+        setMediaItems((prev) => [...prev, { file, type: 'video', thumbnailBlob }]);
+        setImagePreviews((prev) => [...prev, previewUrl]);
+        setLiveVideoFiles((prev) => [...prev, null]);
+      } else {
+        setMediaItems((prev) => [...prev, { file, type: 'image' }]);
+        setImagePreviews((prev) => [...prev, URL.createObjectURL(file)]);
+        setLiveVideoFiles((prev) => [...prev, null]);
+      }
+    }
   }
 
   function removeImage(index: number) {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setMediaItems((prev) => prev.filter((_, i) => i !== index));
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+    setLiveVideoFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleLiveVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || pendingLiveIdx === null) return;
+    e.target.value = '';
+    setLiveVideoFiles((prev) => {
+      const next = [...prev];
+      next[pendingLiveIdx] = file;
+      return next;
+    });
+    setPendingLiveIdx(null);
+  }
+
+  function extractVideoThumbnail(file: File): Promise<{ thumbnailBlob: Blob; previewUrl: string }> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      const url = URL.createObjectURL(file);
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => {
+        video.currentTime = 0.1;
+      });
+      video.addEventListener('seeked', () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d')!.drawImage(video, 0, 0);
+        URL.revokeObjectURL(url);
+        canvas.toBlob((blob) => {
+          if (!blob) { reject(new Error('thumbnail failed')); return; }
+          resolve({ thumbnailBlob: blob, previewUrl: URL.createObjectURL(blob) });
+        }, 'image/jpeg', 0.8);
+      });
+      video.addEventListener('error', reject);
+      video.load();
+    });
   }
 
   function handleBookQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -142,19 +205,20 @@ export function AddMemoryScreen() {
     e.preventDefault();
     if (type !== 'book' && !locationId) { setError('请选择地点'); return; }
     if (!date) { setError('请选择日期'); return; }
-    if (type === 'photo' && imageFiles.length === 0) { setError('请至少上传一张照片'); return; }
-    if (type === 'note' && noteSubtype === 'handwritten' && imageFiles.length === 0) { setError('请至少上传一张手写笔记图片'); return; }
+    if (type === 'photo' && mediaItems.length === 0) { setError('请至少上传一张照片或视频'); return; }
+    if (type === 'note' && noteSubtype === 'handwritten' && mediaItems.length === 0) { setError('请至少上传一张手写笔记图片'); return; }
     if (type === 'note' && noteSubtype === 'text' && !noteContent.trim()) { setError('请输入笔记内容'); return; }
     if (type === 'book' && !bookTitle.trim()) { setError('请输入书名'); return; }
 
     setSaving(true);
+    setUploadProgress(null);
     setError('');
     try {
       if (type === 'photo') {
-        await createPhotoMemory(locationId, date, imageFiles, caption || undefined);
+        await createPhotoMemory(locationId, date, mediaItems, liveVideoFiles, caption || undefined, (uploaded, total) => setUploadProgress({ uploaded, total }));
         navigate(`/location/${locationId}`);
       } else if (type === 'note') {
-        await createNoteMemory(locationId, date, noteSubtype, noteContent || undefined, imageFiles.length > 0 ? imageFiles : undefined);
+        await createNoteMemory(locationId, date, noteSubtype, noteContent || undefined, mediaItems.length > 0 ? mediaItems.map((m) => m.file) : undefined);
         navigate(`/location/${locationId}`);
       } else if (type === 'book') {
         const filledQuotes = quotes.map((q) => q.trim()).filter(Boolean);
@@ -178,6 +242,7 @@ export function AddMemoryScreen() {
       console.error(err);
     } finally {
       setSaving(false);
+      setUploadProgress(null);
     }
   }
 
@@ -187,7 +252,7 @@ export function AddMemoryScreen() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }} className="min-h-screen p-6" style={{ fontFamily: 'var(--font-serif)' }}>
       <div className="max-w-md mx-auto">
         {/* Header */}
-        <div className="mb-10">
+        <div className="mb-8">
           <Link to={locationId ? `/location/${locationId}` : '/'} style={{ color: 'var(--ink-light)', fontSize: '0.875rem' }} className="inline-flex items-center gap-2 mb-6 hover:opacity-70 transition-opacity">
             <ArrowLeft size={16} /> 返回
           </Link>
@@ -197,9 +262,9 @@ export function AddMemoryScreen() {
         </div>
 
         {/* Type tabs */}
-        <div className="flex gap-6 mb-8">
+        <div className="flex gap-2 mb-8">
           {([{ key: 'photo', label: '照片' }, { key: 'note', label: '笔记' }, { key: 'book', label: '书籍' }] as const).map(({ key, label }) => (
-            <button key={key} onClick={() => setType(key)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.875rem', color: type === key ? 'var(--ink-text)' : 'var(--ink-light)', paddingBottom: '4px', borderBottom: type === key ? '1px solid var(--ink-text)' : 'none', transition: 'all 0.2s' }}>
+            <button key={key} onClick={() => setType(key)} className={`glass-chip${type === key ? ' active' : ''}`}>
               {label}
             </button>
           ))}
@@ -207,9 +272,9 @@ export function AddMemoryScreen() {
 
         {/* Note subtype */}
         {type === 'note' && (
-          <div className="flex gap-4 mb-8">
+          <div className="flex gap-2 mb-8">
             {(['text', 'handwritten'] as NoteSubtype[]).map((sub) => (
-              <button key={sub} onClick={() => setNoteSubtype(sub)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-serif)', fontSize: '0.8rem', color: noteSubtype === sub ? 'var(--ink-text)' : 'var(--ink-faint)', paddingBottom: '2px', borderBottom: noteSubtype === sub ? '1px solid var(--ink-faint)' : 'none' }}>
+              <button key={sub} onClick={() => setNoteSubtype(sub)} className={`glass-chip${noteSubtype === sub ? ' active' : ''}`} style={{ fontSize: '0.75rem' }}>
                 {sub === 'text' ? '文字' : '手写'}
               </button>
             ))}
@@ -220,12 +285,29 @@ export function AddMemoryScreen() {
           {/* Image upload (photo / handwritten note) */}
           {showImageUpload && (
             <div>
-              <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" />
+              <input ref={fileInputRef} type="file" accept={type === 'photo' ? 'image/*,video/*' : 'image/*'} multiple onChange={handleFileChange} className="hidden" />
+              <input ref={liveVideoInputRef} type="file" accept="video/*" className="hidden" onChange={handleLiveVideoChange} />
               {imagePreviews.length > 0 && (
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   {imagePreviews.map((src, i) => (
                     <div key={i} className="relative" style={{ aspectRatio: '1', overflow: 'hidden' }}>
                       <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'contrast(0.92) saturate(0.85)' }} />
+                      {mediaItems[i]?.type === 'video' && (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(58,54,50,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <svg width="10" height="12" viewBox="0 0 10 12" fill="white"><polygon points="0,0 10,6 0,12"/></svg>
+                          </div>
+                        </div>
+                      )}
+                      {type === 'photo' && mediaItems[i]?.type === 'image' && (
+                        <button
+                          type="button"
+                          onClick={() => { setPendingLiveIdx(i); liveVideoInputRef.current?.click(); }}
+                          style={{ position: 'absolute', bottom: '4px', left: '50%', transform: 'translateX(-50%)', background: liveVideoFiles[i] ? 'rgba(70,120,70,0.8)' : 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '6px', padding: '2px 6px', cursor: 'pointer', color: 'white', fontSize: '0.6rem', fontFamily: 'var(--font-serif)', whiteSpace: 'nowrap' }}
+                        >
+                          {liveVideoFiles[i] ? '✓ 实况' : '+ 实况'}
+                        </button>
+                      )}
                       <button type="button" onClick={() => removeImage(i)} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(58,54,50,0.6)', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
                         <X size={12} color="white" />
                       </button>
@@ -233,9 +315,9 @@ export function AddMemoryScreen() {
                   ))}
                 </div>
               )}
-              <div className="flex items-center justify-center cursor-pointer transition-opacity hover:opacity-70" style={{ height: imagePreviews.length > 0 ? '48px' : '180px', border: '1px dashed var(--ink-faint)', background: 'var(--paper-warm)' }} onClick={() => fileInputRef.current?.click()}>
+              <div className="glass-dropzone flex items-center justify-center cursor-pointer transition-opacity hover:opacity-70" style={{ height: imagePreviews.length > 0 ? '48px' : '180px' }} onClick={() => fileInputRef.current?.click()}>
                 <span style={{ color: 'var(--ink-faint)', fontSize: '0.8rem' }}>
-                  {imagePreviews.length > 0 ? '+ 继续添加' : type === 'photo' ? '点击上传照片（可多选）' : '上传手写笔记照片（可多选）'}
+                  {imagePreviews.length > 0 ? '+ 继续添加' : type === 'photo' ? '点击上传照片或视频（可多选）' : '上传手写笔记照片（可多选）'}
                 </span>
               </div>
             </div>
@@ -287,7 +369,7 @@ export function AddMemoryScreen() {
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -4 }}
-                      style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--paper-bg)', border: '1px solid var(--ink-faint)', boxShadow: '0 4px 12px var(--paper-shadow)', zIndex: 100, maxHeight: '240px', overflowY: 'auto' }}
+                      style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'rgba(28,28,30,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', borderRadius: '12px', zIndex: 100, maxHeight: '240px', overflowY: 'auto', overflow: 'hidden' }}
                     >
                       {bookResults.map((r, i) => (
                         <button
@@ -333,7 +415,7 @@ export function AddMemoryScreen() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '80px', height: '110px', border: '1px dashed var(--ink-faint)', background: 'var(--paper-warm)' }} onClick={() => coverInputRef.current?.click()}>
+                  <div className="glass-dropzone flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '80px', height: '110px' }} onClick={() => coverInputRef.current?.click()}>
                     <span style={{ color: 'var(--ink-faint)', fontSize: '0.7rem', textAlign: 'center', padding: '4px' }}>上传封面</span>
                   </div>
                 )}
@@ -390,6 +472,31 @@ export function AddMemoryScreen() {
             </select>
           </div>
 
+          {/* Parent location management (shown when a location is selected) */}
+          {locationId && (() => {
+            const selected = locations.find((l) => l.id === locationId);
+            if (!selected) return null;
+            return (
+              <div>
+                <label style={labelStyle}>「{selected.name}」的上属地点（可选）</label>
+                <select
+                  value={selected.parent_id ?? ''}
+                  onChange={async (e) => {
+                    const newParentId = e.target.value || null;
+                    await updateLocationParent(locationId, newParentId).catch(console.error);
+                    setLocations((prev) => prev.map((l) => l.id === locationId ? { ...l, parent_id: newParentId } : l));
+                  }}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                >
+                  <option value="">无</option>
+                  {locations.filter((l) => l.id !== locationId).map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
+
           {/* Date */}
           <div>
             <label style={labelStyle}>日期</label>
@@ -399,8 +506,8 @@ export function AddMemoryScreen() {
           {error && <p style={{ color: 'var(--ink-light)', fontSize: '0.8rem' }}>{error}</p>}
 
           <div className="pt-4">
-            <button type="submit" disabled={saving} style={{ width: '100%', padding: '14px', background: 'var(--ink-text)', color: 'var(--paper-warm)', fontSize: '0.875rem', fontFamily: 'var(--font-serif)', border: 'none', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>
-              {saving ? '保存中…' : '保存記憶'}
+            <button type="submit" disabled={saving} className="glass-action-btn">
+              {uploadProgress ? `上传中（${uploadProgress.uploaded}/${uploadProgress.total}）…` : saving ? '保存中…' : '保存記憶'}
             </button>
           </div>
         </form>

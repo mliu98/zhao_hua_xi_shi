@@ -48,3 +48,22 @@ create table book_quotes (
 -- Storage: go to Supabase Dashboard → Storage → New bucket
 -- Name: memory-images
 -- Public bucket: true
+
+-- Migration: hierarchical locations
+-- Run in Supabase SQL Editor to add parent_id support:
+--
+-- ALTER TABLE locations
+--   ADD COLUMN parent_id uuid REFERENCES locations(id) ON DELETE SET NULL;
+
+-- Migration: add location to books (direct location association)
+-- Run in Supabase SQL Editor:
+--
+-- ALTER TABLE books
+--   ADD COLUMN location_id UUID REFERENCES locations(id) ON DELETE SET NULL;
+
+-- Migration: video support in photo memories
+-- Run in Supabase SQL Editor:
+--
+-- ALTER TABLE photo_images
+--   ADD COLUMN media_type TEXT NOT NULL DEFAULT 'image',
+--   ADD COLUMN video_url  TEXT;

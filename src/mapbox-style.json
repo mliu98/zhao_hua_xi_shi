@@ -1,0 +1,174 @@
+{
+    "version": 8,
+    "name": "Untitled",
+    "metadata": {
+        "mapbox:autocomposite": true,
+        "mapbox:thumb": "data:image/webp;base64,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",
+        "mapbox:uiParadigm": "layers",
+        "mapbox:sdk-support": {
+            "js": "3.21.0",
+            "android": "11.21.0",
+            "ios": "11.21.0"
+        },
+        "mapbox:groups": {}
+    },
+    "center": [-34, 38],
+    "zoom": 2,
+    "lights": [
+        {
+            "id": "directional",
+            "type": "directional",
+            "properties": {
+                "direction": [
+                    "match",
+                    ["config", "lightPreset"],
+                    "dawn",
+                    [
+                        "match",
+                        ["config", "theme"],
+                        "monochrome",
+                        ["literal", [120, 40]],
+                        ["literal", [120, 50]]
+                    ],
+                    "day",
+                    ["literal", [180, 20]],
+                    "dusk",
+                    [
+                        "match",
+                        ["config", "theme"],
+                        "monochrome",
+                        ["literal", [240, 30]],
+                        ["literal", [240, 80]]
+                    ],
+                    "night",
+                    ["literal", [270, 20]],
+                    ["literal", [180, 20]]
+                ],
+                "color": [
+                    "match",
+                    ["config", "lightPreset"],
+                    "dawn",
+                    "hsl(33, 98%, 77%)",
+                    "day",
+                    "hsl(0, 0%, 100%)",
+                    "dusk",
+                    [
+                        "match",
+                        ["config", "theme"],
+                        "monochrome",
+                        "hsl(30, 0%, 50%)",
+                        "hsl(30, 98%, 76%)"
+                    ],
+                    "night",
+                    [
+                        "match",
+                        ["config", "theme"],
+                        "monochrome",
+                        "hsl(0, 0%, 0%)",
+                        "hsl(225, 15%, 29%)"
+                    ],
+                    "hsl(0, 0%, 100%)"
+                ],
+                "intensity": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    12,
+                    [
+                        "match",
+                        ["config", "lightPreset"],
+                        "dawn",
+                        0.5,
+                        "day",
+                        ["match", ["config", "theme"], "monochrome", 0.3, 0.2],
+                        "dusk",
+                        0,
+                        "night",
+                        ["match", ["config", "theme"], "monochrome", 0.01, 0],
+                        0.2
+                    ],
+                    13,
+                    [
+                        "match",
+                        ["config", "lightPreset"],
+                        "night",
+                        ["match", ["config", "theme"], "monochrome", 0.01, 0],
+                        0.2
+                    ],
+                    14,
+                    [
+                        "match",
+                        ["config", "lightPreset"],
+                        "dawn",
+                        ["match", ["config", "theme"], "monochrome", 0.35, 0.5],
+                        "day",
+                        0.2,
+                        "dusk",
+                        ["match", ["config", "theme"], "monochrome", 0.15, 0.2],
+                        "night",
+                        ["match", ["config", "theme"], "monochrome", 0.25, 0.5],
+                        0.2
+                    ]
+                ],
+                "cast-shadows": true,
+                "shadow-intensity": [
+                    "match",
+                    ["config", "lightPreset"],
+                    "night",
+                    0.5,
+                    "dusk",
+                    0.85,
+                    1
+                ],
+                "shadow-quality": 0.5
+            }
+        }
+    ],
+    "terrain": {
+        "source": "mapbox-dem",
+        "exaggeration": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            6,
+            0,
+            7,
+            1,
+            12,
+            1,
+            13.7,
+            0
+        ]
+    },
+    "imports": [
+        {
+            "id": "basemap",
+            "url": "mapbox://styles/mapbox/standard",
+            "config": {
+                "theme": "faded",
+                "lightPreset": "dusk",
+                "font": "IM FELL DW Pica",
+                "colorCommercial": "hsl(24, 86%, 94%)",
+                "show3dFacades": true
+            }
+        }
+    ],
+    "sources": {
+        "mapbox-dem": {
+            "type": "raster-dem",
+            "url": "mapbox://mapbox.mapbox-terrain-dem-v1",
+            "tileSize": 512
+        }
+    },
+    "sprite": "mapbox://sprites/mliu98/cmohy7rmn003e01s6abda7z8k/draft",
+    "glyphs": "mapbox://fonts/mliu98/{fontstack}/{range}.pbf",
+    "projection": {"name": "globe"},
+    "layers": [],
+    "created": "2026-04-28T01:29:40.511Z",
+    "modified": "2026-04-28T01:41:31.085Z",
+    "id": "cmohy7rmn003e01s6abda7z8k",
+    "owner": "mliu98",
+    "visibility": "private",
+    "protected": false,
+    "draft": true
+}

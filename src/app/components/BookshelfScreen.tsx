@@ -100,21 +100,23 @@ function YearNavigator({
   const canNext = idx > 0;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontFamily: 'var(--font-serif)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'var(--font-serif)' }}>
       <button
         onClick={() => canPrev && onChange(years[idx + 1])}
         disabled={!canPrev}
-        style={{ background: 'none', border: 'none', cursor: canPrev ? 'pointer' : 'default', padding: '4px', color: canPrev ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: canPrev ? 1 : 0.3, display: 'flex', alignItems: 'center' }}
+        className="glass-chip"
+        style={{ padding: '4px 8px', opacity: canPrev ? 1 : 0.3, cursor: canPrev ? 'pointer' : 'default', display: 'flex', alignItems: 'center' }}
       >
         <ChevronLeft size={14} />
       </button>
-      <span style={{ color: 'var(--ink-text)', fontSize: '0.875rem', minWidth: '36px', textAlign: 'center' }}>
+      <span style={{ color: 'var(--ink-text)', fontSize: '0.875rem', minWidth: '44px', textAlign: 'center', padding: '0 4px' }}>
         {selected}
       </span>
       <button
         onClick={() => canNext && onChange(years[idx - 1])}
         disabled={!canNext}
-        style={{ background: 'none', border: 'none', cursor: canNext ? 'pointer' : 'default', padding: '4px', color: canNext ? 'var(--ink-light)' : 'var(--ink-faint)', opacity: canNext ? 1 : 0.3, display: 'flex', alignItems: 'center' }}
+        className="glass-chip"
+        style={{ padding: '4px 8px', opacity: canNext ? 1 : 0.3, cursor: canNext ? 'pointer' : 'default', display: 'flex', alignItems: 'center' }}
       >
         <ChevronRight size={14} />
       </button>

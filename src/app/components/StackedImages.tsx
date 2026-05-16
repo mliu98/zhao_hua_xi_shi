@@ -33,6 +33,7 @@ export function StackedImages({ urls, width = 160, height = 200 }: StackedImages
             <img
               src={url}
               alt=""
+              loading="lazy"
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'contrast(0.92) saturate(0.85)' }}
             />
           </div>
